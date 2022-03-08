@@ -1,0 +1,134 @@
+[
+  {
+    "Name": "users",
+    "Fields": [
+      {
+        "Name": "id",
+        "Type": "INT",
+        "Comment": "",
+        "Default": "",
+        "Pk": true,
+        "Fk": false,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": true,
+        "Sensitive": false
+      },
+      {
+        "Name": "created_at",
+        "Type": "timestamp",
+        "Comment": "",
+        "Default": "",
+        "Pk": false,
+        "Fk": false,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": false,
+        "Sensitive": false
+      },
+      {
+        "Name": "updated_at",
+        "Type": "timestamp",
+        "Comment": "",
+        "Default": "",
+        "Pk": false,
+        "Fk": false,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": false,
+        "Sensitive": false
+      },
+      {
+        "Name": "name",
+        "Type": "TINYTEXT",
+        "Comment": "",
+        "Default": "",
+        "Pk": false,
+        "Fk": false,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": false,
+        "Sensitive": false
+      },
+      {
+        "Name": "username",
+        "Type": "TINYTEXT",
+        "Comment": "",
+        "Default": "",
+        "Pk": false,
+        "Fk": false,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": false,
+        "Sensitive": false
+      },
+      {
+        "Name": "password",
+        "Type": "TINYTEXT",
+        "Comment": "-s",
+        "Default": "0000",
+        "Pk": false,
+        "Fk": false,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": false,
+        "Sensitive": true
+      }
+    ],
+    "Edges": [{ "Name": "todos", "Type": "ZeroN", "Direction": "Out" }]
+  },
+  {
+    "Name": "todos",
+    "Fields": [
+      {
+        "Name": "id",
+        "Type": "INT",
+        "Comment": "",
+        "Default": "",
+        "Pk": true,
+        "Fk": false,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": true,
+        "Sensitive": false
+      },
+      {
+        "Name": "id",
+        "Type": "INT",
+        "Comment": "",
+        "Default": "",
+        "Pk": false,
+        "Fk": true,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": false,
+        "Sensitive": false
+      },
+      {
+        "Name": "created_at",
+        "Type": "timestamp",
+        "Comment": "",
+        "Default": "",
+        "Pk": false,
+        "Fk": false,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": false,
+        "Sensitive": false
+      },
+      {
+        "Name": "updated_at",
+        "Type": "timestamp",
+        "Comment": "",
+        "Default": "",
+        "Pk": false,
+        "Fk": false,
+        "Pfk": false,
+        "Unique": false,
+        "AutoIncrement": false,
+        "Sensitive": false
+      }
+    ],
+    "Edges": [{ "Name": "users", "Type": "ZeroN", "Direction": "In" }]
+  }
+]

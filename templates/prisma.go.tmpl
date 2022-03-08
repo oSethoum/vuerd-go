@@ -1,0 +1,8 @@
+database db {
+  url = env("DATABASE_URL")
+  provider = "{{.Provider}}"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
