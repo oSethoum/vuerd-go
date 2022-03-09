@@ -6,3 +6,11 @@ database db {
 generator client {
   provider = "prisma-client-js"
 }
+{{range .Nodes}}
+model {{ .Name }} {
+{{- range .Fields }}
+  {{.Name}} {{.Type}} {{.Options}}{{if gt (len .Default) 0}} @default({{ if eq .DType "String" }}"{{ .Default }}"{{else}} {{.Default}}{{end}}) {{end}}
+{{- end -}}
+{{.Options}}
+}
+{{end}}
