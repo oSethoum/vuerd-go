@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"os"
+	"vuerd/types"
 )
 
 func ReadJSON(v interface{}, path string) error {
@@ -16,10 +17,10 @@ func ReadJSON(v interface{}, path string) error {
 }
 
 func WriteJSON(v interface{}, path string) error {
-	buffer, err := os.ReadFile(path)
+	buffer, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
-	json.Unmarshal(buffer, v)
-	return nil
+
+	return WriteFile(types.File{Path: path, Buffer: string(buffer)})
 }
