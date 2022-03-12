@@ -1,37 +1,105 @@
 package types
 
-type Node struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Fields []Field `json:"fields"`
-	Edges  []Edge  `json:"edges"`
-}
-
-type Edge struct {
-	ID        string `json:"id"`
-	Field     Field  `json:"field"`
-	Reference Field  `json:"reference"`
-	Name      string `json:"name"`
-	Type      string `json:"type"`      // 1..N | 0..1 | 0..N | 1..1
-	Direction string `json:"direction"` // In | Out
-}
-
-type Field struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Type          string `json:"type"`
-	Comment       string `json:"cemment"`
-	Default       string `json:"default"`
-	Pk            bool   `json:"pk"`
-	Fk            bool   `json:"fk"`
-	Pfk           bool   `json:"pfk"`
-	Unique        bool   `json:"unique"`
-	AutoIncrement bool   `json:"autoIncrement"`
-	Sensitive     bool   `json:"sensitive"`
-	Nullable      bool   `json:"nullable"`
-}
-
-type File struct {
-	Path   string `json:"path"`
-	Buffer string `json:"buffer"`
+var DataTypes = map[string]string{
+	"bfile":              "lob",
+	"bigint":             "long",
+	"bigserial":          "long",
+	"binary":             "string",
+	"binary_double":      "double",
+	"binary_float":       "float",
+	"bit":                "int",
+	"blob":               "lob",
+	"bool":               "boolean",
+	"boolean":            "boolean",
+	"box":                "string",
+	"bytea":              "string",
+	"char":               "string",
+	"character":          "string",
+	"cidr":               "string",
+	"circle":             "string",
+	"clob":               "lob",
+	"date":               "date",
+	"datetime":           "datetime",
+	"datetime2":          "datetime",
+	"datetimeoffset":     "datetime",
+	"dec":                "decimal",
+	"decimal":            "decimal",
+	"double":             "double",
+	"enum":               "string",
+	"fixed":              "decimal",
+	"float":              "float",
+	"float4":             "float",
+	"float8":             "double",
+	"geography":          "string",
+	"geometry":           "string",
+	"geometrycollection": "string",
+	"image":              "lob",
+	"inet":               "string",
+	"int":                "int",
+	"int2":               "int",
+	"int4":               "int",
+	"int8":               "long",
+	"integer":            "int",
+	"interval":           "time",
+	"json":               "lob",
+	"jsonb":              "lob",
+	"line":               "string",
+	"linestring":         "string",
+	"long":               "lob",
+	"longblob":           "lob",
+	"longtext":           "lob",
+	"lseg":               "string",
+	"macaddr":            "string",
+	"macaddr8":           "string",
+	"mediumblob":         "lob",
+	"mediumint":          "int",
+	"mediumtext":         "lob",
+	"money":              "double",
+	"multilinestring":    "string",
+	"multipoint":         "string",
+	"multipolygon":       "string",
+	"nchar":              "string",
+	"nclob":              "lob",
+	"ntext":              "lob",
+	"number":             "long",
+	"numeric":            "decimal",
+	"nvarchar":           "string",
+	"nvarchar2":          "string",
+	"path":               "string",
+	"pg_lsn":             "int",
+	"point":              "string",
+	"polygon":            "string",
+	"raw":                "lob",
+	"real":               "double",
+	"serial":             "int",
+	"serial2":            "int",
+	"serial4":            "int",
+	"serial8":            "long",
+	"set":                "string",
+	"smalldatetime":      "datetime",
+	"smallint":           "int",
+	"smallmoney":         "float",
+	"smallserial":        "int",
+	"sql_variant":        "string",
+	"text":               "lob",
+	"time":               "time",
+	"timestamp":          "datetime",
+	"timestamptz":        "datetime",
+	"timetz":             "time",
+	"tinyblob":           "lob",
+	"tinyint":            "int",
+	"tinytext":           "lob",
+	"tsquery":            "string",
+	"tsvector":           "string",
+	"txid_snapshot":      "string",
+	"uniqueidentifier":   "string",
+	"uritype":            "string",
+	"uuid":               "string",
+	"varbinary":          "string",
+	"varbit":             "int",
+	"varchar":            "string",
+	"varchar2":           "string",
+	"xml":                "lob",
+	"xmltype":            "string",
+	"year":               "int",
 }

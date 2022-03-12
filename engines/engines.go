@@ -1,8 +1,7 @@
-package engine
+package engines
 
 import (
 	"strings"
-	"vuerd/models"
 	"vuerd/types"
 	"vuerd/utils"
 
@@ -43,7 +42,7 @@ func (Helper) Pascal(word string) string {
 }
 
 func (Helper) Camel(word string) string {
-	return utils.SnakeToCamel(word)
+	return utils.CorrectCase(kace.Camel(word))
 }
 
 func (Helper) Kebab(word string) string {
@@ -64,7 +63,7 @@ func parseRelationshipType(relationshiptType string) string {
 	return "WTF"
 }
 
-func Simplify(state models.State, t map[string]string, m map[string]string, c func(string) string) []types.Node {
+func Simplify(state types.State, t map[string]string, m map[string]string, c func(string) string) []types.Node {
 	nodes := make([]types.Node, 0)
 
 	for _, table := range state.TableState.Tables {
@@ -127,7 +126,7 @@ func Simplify(state models.State, t map[string]string, m map[string]string, c fu
 	return nodes
 }
 
-func findColumnById(id string, columns []models.Column, t, m map[string]string, c func(string) string) types.Field {
+func findColumnById(id string, columns []types.Column, t, m map[string]string, c func(string) string) types.Field {
 	for _, column := range columns {
 		if id == column.Id {
 			return types.Field{
