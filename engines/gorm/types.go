@@ -5,7 +5,7 @@ var GormTypes = map[string]string{
 	"long":     "int64",
 	"float":    "float64",
 	"double":   "float64",
-	"decimal":  "int",
+	"decimal":  "fload64",
 	"boolean":  "bool",
 	"string":   "string",
 	"lob":      "string",

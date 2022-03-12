@@ -1,7 +1,7 @@
 package main
 
 import (
-	"vuerd/engines/prisma"
+	"vuerd/engines/gorm"
 	"vuerd/types"
 	"vuerd/utils"
 )
@@ -9,5 +9,5 @@ import (
 func main() {
 	var state types.State
 	utils.ReadJSON(&state, "db/db.vuerd.json")
-	prisma.Prisma(state)
+	gorm.Gorm(state)
 }

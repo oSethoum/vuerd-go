@@ -26,7 +26,7 @@ func Schema(nodes []types.Node, provider string) types.File {
 	for _, node := range nodes {
 
 		buffer = append(buffer,
-			fmt.Sprintf("model %s {", helper.Pascal(helper.MultiSingular(node.Name))),
+			fmt.Sprintf("model %s {", helper.Pascal(helper.Singular(node.Name))),
 		)
 
 		var pfks []string
@@ -81,15 +81,15 @@ func Schema(nodes []types.Node, provider string) types.File {
 				case "0..1", "1..1":
 					{
 						buffer = append(buffer, fmt.Sprintf("\t%s %s",
-							helper.Camel(helper.MultiPlural(edge.Name)),
-							helper.Pascal(helper.MultiSingular(edge.Name))+"?",
+							helper.Camel(helper.Plural(edge.Name)),
+							helper.Pascal(helper.Singular(edge.Name))+"?",
 						))
 					}
 				case "0..N", "1..N":
 					{
 						buffer = append(buffer, fmt.Sprintf("\t%s %s",
-							helper.Camel(helper.MultiPlural(edge.Name)),
-							helper.Pascal(helper.MultiSingular(edge.Name))+"[]",
+							helper.Camel(helper.Plural(edge.Name)),
+							helper.Pascal(helper.Singular(edge.Name))+"[]",
 						))
 					}
 				}
@@ -101,7 +101,7 @@ func Schema(nodes []types.Node, provider string) types.File {
 					{
 						buffer = append(buffer, fmt.Sprintf("\t%s %s @relation(fields:[%s], references:[%s])",
 							strings.TrimSuffix(edge.Field.Name, "Id"),
-							helper.Pascal(helper.MultiSingular(edge.Name)),
+							helper.Pascal(helper.Singular(edge.Name)),
 							edge.Field.Name,
 							edge.Reference.Name,
 						))
@@ -115,7 +115,7 @@ func Schema(nodes []types.Node, provider string) types.File {
 					{
 						buffer = append(buffer, fmt.Sprintf("\t%s %s @relation(fields:[%s], references:[%s])",
 							strings.TrimSuffix(edge.Field.Name, "Id"),
-							helper.Pascal(helper.MultiSingular(edge.Name)),
+							helper.Pascal(helper.Singular(edge.Name)),
 							edge.Field.Name,
 							edge.Reference.Name,
 						))
