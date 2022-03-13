@@ -7,11 +7,12 @@ import (
 	"vuerd/types"
 )
 
+var idType string
+
 func Schema(nodes []types.Node) types.File {
 
 	helper := engines.Helper{}
 	buffer := []string{}
-	var idType string
 
 	for _, node := range nodes {
 
@@ -108,11 +109,19 @@ func Schema(nodes []types.Node) types.File {
 	}
 
 	base := []string{
+		"package model",
+		"",
+		"import (",
+		"\t\"gorm.io/gorm\"",
+		"\t\"time\"",
+		")",
+		"",
 		"type Model struct {",
 		"\tID " + idType + " `gorm:\"primaryKey\" json:\"id\"`",
 		"\tCreatedAt time.Time `json:\"createdAt\"`",
 		"\tUpdatedAt time.Time `json:\"updatedAt\"`",
 		"\tDeletedAt gorm.DeletedAt `gorm:\"index\" json:\"deletedAt\"`",
+		"}",
 		"",
 	}
 
@@ -124,7 +133,8 @@ func Schema(nodes []types.Node) types.File {
 	}
 }
 
-func Migration(nodes []types.Node) {
+func DB(nodes []types.Node, driver, mod string) types.File {
+	buffer := []string{}
 	type edge struct {
 		first string
 		last  string
@@ -142,14 +152,61 @@ func Migration(nodes []types.Node) {
 	}
 
 	for _, e := range edges {
-		swap(&models, indexOf(models, e.first), indexOf(models, e.last))
+		models = swap(models, indexOf(models, e.first), indexOf(models, e.last))
 	}
 
-	fmt.Printf("%v", models)
+	buffer = append(buffer,
+		"package db",
+		"",
+		"import (",
+		fmt.Sprintf("\t\"%s/models\"", mod),
+		"\t\"log\"",
+		"\t\"os\"",
+		"",
+		"\t\"gorm.io/driver/sqlite\"",
+		"\t\"gorm.io/gorm\"",
+		"\t\"gorm.io/gorm/logger\"",
+		")",
+		"",
+		"var DB *gorm.DB",
+		"",
+		"func Init() error {",
+		fmt.Sprintf("\tdns := \"%s\"", "dev.sqlite"),
+		fmt.Sprintf("\tdb, err := gorm.Open(%s.Open(dns), &gorm.Config{", driver),
+		"\t\tLogger: logger.New(log.New(os.Stdout, \"\\r\\n\", log.LstdFlags), logger.Config{",
+		"\t\t\tLogLevel: logger.Info,",
+		"\t\t\tColorful: true,",
+		"\t\t}),",
+		"\t})",
+		"\tif err != nil {",
+		"\t\treturn err",
+		"\t}",
+		"\tdb.AutoMigrate(",
+	)
+
+	for _, model := range models {
+		buffer = append(buffer, fmt.Sprintf("\t\t&models.%s{},", model))
+	}
+
+	buffer = append(buffer,
+		"\t)",
+		"",
+		"\tDB = db",
+		"\treturn nil",
+		"}",
+	)
+
+	return types.File{
+		Buffer: strings.Join(buffer, "\n"),
+		Path:   "db/db.go",
+	}
 }
 
-func swap(models *[]string, first, last int) {
-
+func swap(models []string, first, last int) []string {
+	tmp := models[first]
+	models[first] = models[last]
+	models[last] = tmp
+	return models
 }
 
 func indexOf(models []string, model string) int {
@@ -159,4 +216,106 @@ func indexOf(models []string, model string) int {
 		}
 	}
 	return -1
+}
+
+func Service(nodes []types.Node, mod string) []types.File {
+	files := []types.File{}
+	helper := engines.Helper{}
+	serviceBuffer := []string{}
+	serviceBuffer = append(serviceBuffer,
+		"package services",
+		"",
+		"import (",
+		fmt.Sprintf("\"%s/db\"", mod),
+		"\"gorm.io/gorm\"",
+		")",
+		"",
+		"var DB *gorm.DB",
+		"",
+		"func Init() {",
+		"\tDB = db.DB",
+		"}",
+	)
+
+	files = append(files, types.File{
+		Buffer: strings.Join(serviceBuffer, "\n"),
+		Path:   "services/services.go",
+	})
+
+	for _, node := range nodes {
+		buffer := []string{
+			"package services",
+			"",
+			"import (",
+			fmt.Sprintf("\t\"%s/models\"", mod),
+			"\t\"errors\"",
+			")",
+			"",
+		}
+		camel := helper.Camel(helper.Singular(node.Name))
+		camels := helper.Camel(helper.Plural(node.Name))
+		pascal := helper.Pascal(helper.Singular(node.Name))
+		pascals := helper.Pascal(helper.Plural(node.Name))
+		buffer = append(buffer,
+			fmt.Sprintf("func Find%s(%s *models.%s) (*models.%s, error) {", pascal, camel, pascal, pascal),
+			fmt.Sprintf("\tresult := DB.First(%s, %s.ID)", camel, camel),
+			fmt.Sprintf("\treturn %s, result.Error", camel),
+			"}",
+			"",
+			fmt.Sprintf("func Find%s() (*[]*models.%s, error) {", pascals, pascal),
+			fmt.Sprintf("\t%s := new([]*models.%s)", camels, pascal),
+			fmt.Sprintf("\tresult := DB.Find(%s)", camels),
+			fmt.Sprintf("\treturn %s, result.Error", camels),
+			"}",
+			"",
+			fmt.Sprintf("func Create%s(%s *models.%s) (*models.%s, error) {", pascal, camel, pascal, pascal),
+			fmt.Sprintf("\tresult := DB.Create(%s)", camel),
+			fmt.Sprintf("\treturn %s, result.Error", camel),
+			"}",
+			"",
+			fmt.Sprintf("func Create%s(%s *[]*models.%s) (*[]*models.%s, error) {", pascals, camels, pascal, pascal),
+			fmt.Sprintf("\tresult := DB.Create(%s)", camels),
+			fmt.Sprintf("\treturn %s, result.Error", camels),
+			"}",
+			"",
+			fmt.Sprintf("func Update%s(%s *models.%s) (*models.%s, error) {", pascal, camel, pascal, pascal),
+			fmt.Sprintf("\tresult := DB.First(%s.ID)", camel),
+			"\tif result.Error != nil {",
+			"\t\treturn nil, result.Error",
+			"\t}",
+			fmt.Sprintf("\tresult = DB.Save(%s)", camel),
+			fmt.Sprintf("\treturn %s, result.Error", camel),
+			"}",
+			"",
+			fmt.Sprintf("func Update%s(%s *[]*models.%s) (*[]*models.%s, error) {", pascals, camels, pascal, pascal),
+			fmt.Sprintf("\tIDs := make([]%s, 0)", idType),
+			fmt.Sprintf("\tfor _, %s := range *%s {", camel, camels),
+			fmt.Sprintf("\t	IDs = append(IDs, %s.ID)", camel),
+			"\t}",
+			fmt.Sprintf("\tres := new([]*models.%s)", pascal),
+			"\tDB.Find(res, IDs)",
+			fmt.Sprintf("\tif len(*res) != len(*%s) {", camels),
+			"\t	return nil, errors.New(\"error in IDs\")",
+			"\t}",
+			fmt.Sprintf("\tresult := DB.Save(%s)", camels),
+			fmt.Sprintf("\treturn %s, result.Error", camels),
+			"}",
+			"",
+			fmt.Sprintf("func Delete%s(%s *models.%s) (*models.%s, error) {", pascal, camel, pascal, pascal),
+			fmt.Sprintf("\tresult := DB.Delete(%s)", camel),
+			fmt.Sprintf("\treturn %s, result.Error", camel),
+			"}",
+			"",
+			fmt.Sprintf("func Delete%s(%s *[]*models.%s) (*[]*models.%s, error) {", pascals, camels, pascal, pascal),
+			fmt.Sprintf("\tresult := DB.Delete(%s)", camels),
+			fmt.Sprintf("\treturn %s, result.Error", camels),
+			"}",
+		)
+		files = append(files, types.File{
+			Buffer: strings.Join(buffer, "\n"),
+			Path:   fmt.Sprintf("services/%s.go", camels),
+		})
+	}
+
+	return files
 }

@@ -21,5 +21,5 @@ func WriteJSON(v interface{}, path string) error {
 	if err != nil {
 		return err
 	}
-	return WriteFile(types.File{Path: path, Buffer: string(buffer)})
+	return WriteFile(types.File{Path: path, Buffer: string(buffer)}, nil)
 }

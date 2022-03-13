@@ -3,9 +3,9 @@
     "version": "2.2.11",
     "width": 4000,
     "height": 4000,
-    "scrollTop": -1799.3333333333335,
-    "scrollLeft": -1146.666666666667,
-    "zoomLevel": 1,
+    "scrollTop": -1866.3333333333335,
+    "scrollLeft": -1265.666666666667,
+    "zoomLevel": 0.7,
     "show": {
       "tableComment": true,
       "columnComment": true,
@@ -167,7 +167,7 @@
             "name": "password",
             "comment": "-s",
             "dataType": "TINYTEXT",
-            "default": "0000",
+            "default": "",
             "option": {
               "autoIncrement": false,
               "primaryKey": false,
@@ -191,7 +191,7 @@
           "active": false,
           "left": 1417.889,
           "top": 1918.111,
-          "zIndex": 3,
+          "zIndex": 11,
           "widthName": 60,
           "widthComment": 60,
           "color": "#03A9F4"

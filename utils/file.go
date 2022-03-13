@@ -6,7 +6,10 @@ import (
 	"vuerd/types"
 )
 
-func WriteFile(file types.File) error {
+func WriteFile(file types.File, dir *string) error {
+	if dir != nil {
+		file.Path = path.Join(*dir, file.Path)
+	}
 	folder := path.Dir(file.Path)
 	err := os.MkdirAll(folder, os.ModeAppend)
 	if err != nil {
@@ -19,9 +22,9 @@ func WriteFile(file types.File) error {
 	return nil
 }
 
-func WriteFiles(files []types.File) error {
+func WriteFiles(files []types.File, dir *string) error {
 	for _, file := range files {
-		if err := WriteFile(file); err != nil {
+		if err := WriteFile(file, dir); err != nil {
 			return err
 		}
 	}
