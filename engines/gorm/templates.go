@@ -218,7 +218,7 @@ func indexOf(models []string, model string) int {
 	return -1
 }
 
-func Service(nodes []types.Node, mod string) []types.File {
+func Services(nodes []types.Node, mod string) []types.File {
 	files := []types.File{}
 	helper := engines.Helper{}
 	serviceBuffer := []string{}

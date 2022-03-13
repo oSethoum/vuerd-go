@@ -12,7 +12,7 @@ func Gorm(state types.State) {
 	nodes := engines.Simplify(state, types.DataTypes, GormTypes, helper.Pascal)
 	files = append(files, Schema(nodes))
 	files = append(files, DB(nodes, "sqlite", "api"))
-	files = append(files, Service(nodes, "api")...)
+	files = append(files, Services(nodes, "api")...)
 	dir := "out"
 	utils.WriteFiles(files, &dir)
 }

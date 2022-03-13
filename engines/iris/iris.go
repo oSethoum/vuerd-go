@@ -1,1 +1,5 @@
 package iris
+
+func Iris() {
+
+}
