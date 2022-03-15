@@ -41,6 +41,10 @@ func (Helper) Pascal(word string) string {
 	return kace.Pascal(word)
 }
 
+func (Helper) Snake(word string) string {
+	return kace.Snake(word)
+}
+
 func (Helper) Camel(word string) string {
 	return kace.Camel(word)
 }
@@ -79,7 +83,7 @@ func Simplify(state types.State, t map[string]string, m map[string]string, c fun
 				ID:            column.Id,
 				Name:          c(column.Name),
 				Comment:       column.Comment,
-				Type:          m[t[strings.ToLower(column.DataType)]],
+				Type:          getType(column.DataType, t, m),
 				Default:       column.Default,
 				Pk:            column.Ui.Pk,
 				Fk:            column.Ui.Fk,
@@ -136,7 +140,7 @@ func findColumnById(id string, columns []types.Column, t, m map[string]string, c
 				ID:            column.Id,
 				Name:          c(column.Name),
 				Comment:       column.Comment,
-				Type:          m[t[strings.ToLower(column.DataType)]],
+				Type:          getType(column.DataType, t, m),
 				Default:       column.Default,
 				Pk:            column.Ui.Pk,
 				Fk:            column.Ui.Fk,
@@ -150,4 +154,11 @@ func findColumnById(id string, columns []types.Column, t, m map[string]string, c
 	}
 
 	return types.Field{}
+}
+
+func getType(ct string, t, m map[string]string) string {
+	if m[t[strings.ToLower(ct)]] == "" {
+		return ct
+	}
+	return m[t[strings.ToLower(ct)]]
 }

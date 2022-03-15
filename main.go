@@ -1,7 +1,7 @@
 package main
 
 import (
-	"vuerd/engines/gorm"
+	"vuerd/engines/ent"
 	"vuerd/types"
 	"vuerd/utils"
 )
@@ -9,5 +9,5 @@ import (
 func main() {
 	var state types.State
 	utils.ReadJSON(&state, "db/db.vuerd.json")
-	gorm.Gorm(state)
+	ent.Ent(state)
 }

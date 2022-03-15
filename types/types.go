@@ -94,7 +94,7 @@ var DataTypes = map[string]string{
 	"txid_snapshot":      "string",
 	"uniqueidentifier":   "string",
 	"uritype":            "string",
-	"uuid":               "string",
+	"uuid":               "uuid",
 	"varbinary":          "string",
 	"varbit":             "int",
 	"varchar":            "string",
