@@ -9,6 +9,20 @@ import (
 
 func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 	files := []types.File{}
+	schemaBuffer := []string{
+		"package schema",
+		"",
+		"import (",
+		"\t\"time\"",
+		"\t\"entgo/ent\"",
+		"\t\"entgo/ent/dialect/entsql\"",
+		"\t\"entgo/ent/schema/field\"",
+	}
+
+	if config.Graphql {
+		schemaBuffer = append(schemaBuffer, "\t\"entgo.io/contrib/entgql\"")
+	}
+	schemaBuffer = append(schemaBuffer, "", ")")
 	helper := engines.Helper{}
 
 	for _, node := range nodes {
@@ -23,6 +37,8 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 			"\t\"entgo/ent\"",
 			"\t\"entgo/ent/dialect/entsql\"",
 			"\t\"entgo/ent/schema/field\"",
+			"\t\"entgo/ent/dialect/entsql/edge\"",
+			")",
 		)
 
 		if config.Graphql {
@@ -34,8 +50,9 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 		}
 		buffer = append(buffer, ")")
 
+		bodyBuffer := []string{}
 		// schema
-		buffer = append(buffer,
+		bodyBuffer = append(bodyBuffer,
 			fmt.Sprintf("// %s Schema", pascal),
 			fmt.Sprintf("type %s struct {", pascal),
 			"\tent.Schema",
@@ -44,7 +61,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 		)
 
 		// annotation
-		buffer = append(buffer,
+		bodyBuffer = append(bodyBuffer,
 			fmt.Sprintf("// %s Annotations", pascal),
 			fmt.Sprintf("func (%s) Annotations() []schema.Anotation {", pascal),
 			"\treturn []schema.Annotation {",
@@ -55,11 +72,11 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 		)
 
 		if countNonKeyFields(node) > 0 {
-			buffer = append(buffer,
+			bodyBuffer = append(bodyBuffer,
 				fmt.Sprintf("// %s Fields", pascal),
-				fmt.Sprintf("func (%s) Fields() []ent.Field{", pascal),
+				fmt.Sprintf("func (%s) Fields() []ent.Field {", pascal),
 			)
-			buffer = append(buffer, "\treturn []ent.Field{")
+			bodyBuffer = append(bodyBuffer, "\treturn []ent.Field{")
 
 			// fields
 			for _, field := range node.Fields {
@@ -75,6 +92,8 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 
 				if field.Nullable {
 					options = append(options, "Optional()", "Nillable()")
+				} else {
+					options = append(options, "NotEmpty()")
 				}
 
 				if strings.HasPrefix(strings.ToLower(field.Type), "enum") {
@@ -83,12 +102,14 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 						namedValues := []string{}
 						for _, enum := range enums {
 							namedValues = append(namedValues,
-								fmt.Sprintf("\"%s\"", helper.Pascal(enum)),
-								fmt.Sprintf("\"%s\"", strings.ToUpper(helper.Pascal(enum))),
-								"\n",
+								fmt.Sprintf("\t\t\"%s\"", helper.Pascal(enum)),
+								", ",
+								"\t"+strings.ToUpper(enum),
+								", ",
+								"\n\t\t\t",
 							)
 						}
-						options = append(options, fmt.Sprintf("NamedValues(%s)", strings.Join(namedValues, "")))
+						options = append(options, fmt.Sprintf("NamedValues(\n\t\t%s)", strings.Join(namedValues, "")))
 					} else {
 						options = append(options, fmt.Sprintf("Values(\"%s\")", strings.Join(enums, "\", \"")))
 					}
@@ -113,7 +134,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 				}
 
 				if field.Pk && field.Type == "UUID" {
-					buffer = append(buffer, fmt.Sprintf("\t\tfield.%s(\"id\", uuid.UUID{}).%s", field.Type, strings.Join(options, ".\n\t")))
+					bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.%s(\"id\", uuid.UUID{}).%s", field.Type, strings.Join(options, ".\n\t")))
 				}
 
 				if config.Graphql {
@@ -122,45 +143,47 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 
 				if !field.Pk && !field.Fk && !field.Pfk {
 					if field.Type == "UUID" {
-						buffer = append(buffer, fmt.Sprintf("\t\tfield.%s(\"%s\", uuid.UUID{}).%s", field.Type, field.Name, strings.Join(options, ".\n\t\t\t")))
+						bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.%s(\"%s\", uuid.UUID{}).%s", field.Type, field.Name, strings.Join(options, ".\n\t\t\t")))
 					} else if field.Type == "Json" {
-						// buffer = append(buffer, fmt.Sprintf("field.%s(\"%s\").%s", field.Type, field.Name, strings.Join(options, ".\n\t")))
+						// bodyBuffer = append(bodyBuffer, fmt.Sprintf("field.%s(\"%s\").%s", field.Type, field.Name, strings.Join(options, ".\n\t")))
+					} else if strings.HasPrefix(field.Type, "Enum") {
+						bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.Enum(\"%s\", uuid.UUID{}).%s", field.Name, strings.Join(options, ".\n\t\t\t")))
 					} else {
-						buffer = append(buffer, fmt.Sprintf("\t\tfield.%s(\"%s\").%s", field.Type, field.Name, strings.Join(options, ".\n\t\t\t")))
+						bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.%s(\"%s\").%s", field.Type, field.Name, strings.Join(options, ".\n\t\t\t")))
 					}
 				}
 
 			}
 
-			buffer = append(buffer, "\t}")
+			bodyBuffer = append(bodyBuffer, "\t}")
 		}
-		buffer = append(buffer, "}", "")
+		bodyBuffer = append(bodyBuffer, "}", "")
 
 		// edges
 		if len(node.Edges) > 0 {
 
-			buffer = append(buffer, fmt.Sprintf("// %s Edges", pascal))
-			buffer = append(buffer, fmt.Sprintf("func (%s) Edges() []ent.Edge {", pascal))
-			buffer = append(buffer, "\treturn []ent.Edge{")
+			bodyBuffer = append(bodyBuffer, fmt.Sprintf("// %s Edges", pascal))
+			bodyBuffer = append(bodyBuffer, fmt.Sprintf("func (%s) Edges() []ent.Edge {", pascal))
+			bodyBuffer = append(bodyBuffer, "\treturn []ent.Edge{")
 
 			for _, edge := range node.Edges {
 				if edge.Direction == "Out" {
 					switch edge.Type {
 					case "0..N":
 						{
-							buffer = append(buffer,
+							bodyBuffer = append(bodyBuffer,
 								fmt.Sprintf("\t\tedge.To(\"%s\", %s.Type),", edge.Name, helper.Singular(helper.Pascal(edge.Name))),
 							)
 						}
 					case "1..N":
 						{
-							buffer = append(buffer,
+							bodyBuffer = append(bodyBuffer,
 								fmt.Sprintf("\t\tedge.To(\"%s\", %s.Type).Required(),", edge.Name, helper.Singular(helper.Pascal(edge.Name))),
 							)
 						}
 					case "0..1", "1..1":
 						{
-							buffer = append(buffer,
+							bodyBuffer = append(bodyBuffer,
 								fmt.Sprintf("\t\tedge.To(\"%s\", %s.Type).Unique(),", helper.Singular(edge.Name), helper.Singular(helper.Pascal(edge.Name))),
 							)
 						}
@@ -170,7 +193,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 					switch edge.Type {
 					case "0..N", "1..N":
 						{
-							buffer = append(buffer,
+							bodyBuffer = append(bodyBuffer,
 								fmt.Sprintf("\t\tedge.From(\"%s\",%s.Type).Ref(\"%s\").Unique(),",
 									helper.Singular(edge.Name),
 									helper.Singular(helper.Pascal(edge.Name)),
@@ -180,7 +203,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 						}
 					case "1..1":
 						{
-							buffer = append(buffer,
+							bodyBuffer = append(bodyBuffer,
 								fmt.Sprintf("\t\tedge.From(\"%s\",%s.Type).Ref(\"%s\").Unique().Required(),",
 									helper.Singular(edge.Name),
 									helper.Singular(helper.Pascal(edge.Name)),
@@ -191,7 +214,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 
 					case "0..1":
 						{
-							buffer = append(buffer,
+							bodyBuffer = append(bodyBuffer,
 								fmt.Sprintf("\t\tedge.From(\"%s\",%s.Type).Ref(\"%s\").Unique(),",
 									helper.Singular(edge.Name),
 									helper.Singular(helper.Pascal(edge.Name)),
@@ -203,27 +226,75 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 				}
 			}
 
-			buffer = append(buffer, "\t}", "}", "")
+			bodyBuffer = append(bodyBuffer, "\t}", "}", "")
 		}
 
+		if config.SingleFile {
+			schemaBuffer = append(schemaBuffer, bodyBuffer...)
+		}
+
+		bodyBuffer = append(buffer, bodyBuffer...)
 		files = append(files, types.File{
-			Buffer: strings.Join(buffer, "\n"),
+			Buffer: strings.Join(bodyBuffer, "\n"),
 			Path:   fmt.Sprintf("ent/schema/%s.go", helper.Singular(helper.Snake(node.Name))),
 		})
 
-		// if config.Graphql {
-		// 	files = append(files, types.File{
-		// 		Buffer: strings.Join(gqlBuffer, "\n"),
-		// 		Path:   path.Join(config.GraphqlFolder, fmt.Sprintf("/%s.graphqls", helper.Singular(helper.Snake(node.Name)))),
-		// 	})
-		// }
+	}
+
+	if config.SingleFile {
+		files = []types.File{
+			{
+				Buffer: strings.Join(schemaBuffer, "\n"),
+				Path:   "ent/schema.go",
+			},
+		}
 	}
 
 	return files
 }
 
-func GQL(nodes []types.Node) {
+func GQL(nodes []types.Node) []types.File {
+	files := []types.File{}
+	helper := engines.Helper{}
+	files = append(files, types.File{
+		Buffer: MutationInput,
+		Path:   "ent/template/mutation_input.tmpl",
+	})
 
+	schemaBuffer := []string{}
+	schemaBuffer = append(schemaBuffer,
+		"interface Node {",
+		"\tid: ID!",
+		"}",
+		"",
+		"scalar Time",
+		"",
+		"scalar Cursor",
+		"",
+		"type PageInfo {",
+		"\thasNextPage: Boolean!",
+		"\thasPreviousPage: Boolean!",
+		"\tstartCursor: Cursor",
+		"\tendCursor: Cursor",
+		"}",
+		"",
+		"enum OrderDirection {",
+		"\tASC",
+		"\tDESC",
+		"}",
+		"",
+	)
+
+	for _, node := range nodes {
+		buffer := []string{}
+		pascal := helper.Pascal(helper.Singular(node.Name))
+
+		buffer = append(buffer,
+			fmt.Sprintf("type %s implements Node {", pascal))
+
+	}
+
+	return files
 }
 
 func countNonKeyFields(node types.Node) int {

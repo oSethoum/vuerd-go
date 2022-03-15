@@ -17,6 +17,6 @@ var EntTypes = map[string]string{
 }
 
 type SchemaConfig struct {
-	Graphql       bool
-	GraphqlFolder string
+	Graphql    bool
+	SingleFile bool
 }

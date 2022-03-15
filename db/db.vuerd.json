@@ -3,8 +3,8 @@
     "version": "2.2.11",
     "width": 4000,
     "height": 4000,
-    "scrollTop": -1886.3333333333335,
-    "scrollLeft": -1124.666666666667,
+    "scrollTop": -1851.3333333333335,
+    "scrollLeft": -1217.666666666667,
     "zoomLevel": 1,
     "show": {
       "tableComment": true,
@@ -294,13 +294,59 @@
               "widthDefault": 60
             },
             "id": "c427ecf9-ef3d-4561-a9ca-445165c61d0f"
+          },
+          {
+            "name": "text",
+            "comment": "",
+            "dataType": "TINYTEXT",
+            "default": "",
+            "option": {
+              "autoIncrement": false,
+              "primaryKey": false,
+              "unique": false,
+              "notNull": true
+            },
+            "ui": {
+              "active": false,
+              "pk": false,
+              "fk": false,
+              "pfk": false,
+              "widthName": 60,
+              "widthComment": 60,
+              "widthDataType": 64.83544921875,
+              "widthDefault": 60
+            },
+            "id": "8b9a10eb-c2fd-47ea-b127-d46bee1b17b9"
+          },
+          {
+            "name": "status",
+            "comment": "",
+            "dataType": "Enum(\"in_progress\",\"done\")",
+            "default": "\"in_progress\"",
+            "option": {
+              "autoIncrement": false,
+              "primaryKey": false,
+              "unique": false,
+              "notNull": true
+            },
+            "ui": {
+              "active": false,
+              "pk": false,
+              "fk": false,
+              "pfk": false,
+              "widthName": 60,
+              "widthComment": 60,
+              "widthDataType": 163.53515625,
+              "widthDefault": 79.15576171875
+            },
+            "id": "e52145ad-56d7-47cd-96b3-764b06dc5601"
           }
         ],
         "ui": {
           "active": false,
           "left": 1649.9995,
           "top": 2259.6664,
-          "zIndex": 1,
+          "zIndex": 18,
           "widthName": 60,
           "widthComment": 60,
           "color": "#2196F3"
@@ -335,7 +381,7 @@
             "091c59eb-b598-4205-aff0-319e65a20305"
           ],
           "x": 1649.9995,
-          "y": 2335.1664,
+          "y": 2355.6664,
           "direction": "left"
         },
         "constraintName": "fk_users_to_todos",
