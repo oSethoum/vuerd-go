@@ -3,8 +3,8 @@
     "version": "2.2.11",
     "width": 4000,
     "height": 4000,
-    "scrollTop": -1851.3333333333335,
-    "scrollLeft": -1217.666666666667,
+    "scrollTop": -1869.3333333333335,
+    "scrollLeft": -1328.666666666667,
     "zoomLevel": 1,
     "show": {
       "tableComment": true,
@@ -17,13 +17,13 @@
       "columnNotNull": true,
       "relationship": true
     },
-    "database": "MySQL",
+    "database": "MariaDB",
     "databaseName": "vuerd",
     "canvasType": "ERD",
     "language": "GraphQL",
     "tableCase": "pascalCase",
     "columnCase": "camelCase",
-    "highlightTheme": "VS2015",
+    "highlightTheme": "AtomOneDark",
     "bracketType": "none",
     "setting": {
       "relationshipDataTypeSync": true,
@@ -191,7 +191,7 @@
           "active": false,
           "left": 1417.889,
           "top": 1918.111,
-          "zIndex": 2,
+          "zIndex": 6,
           "widthName": 60,
           "widthComment": 60,
           "color": "#03A9F4"
@@ -321,8 +321,8 @@
           {
             "name": "status",
             "comment": "",
-            "dataType": "Enum(\"in_progress\",\"done\")",
-            "default": "\"in_progress\"",
+            "dataType": "BOOLEAN",
+            "default": "false",
             "option": {
               "autoIncrement": false,
               "primaryKey": false,
@@ -336,8 +336,8 @@
               "pfk": false,
               "widthName": 60,
               "widthComment": 60,
-              "widthDataType": 163.53515625,
-              "widthDefault": 79.15576171875
+              "widthDataType": 64.8544921875,
+              "widthDefault": 60
             },
             "id": "e52145ad-56d7-47cd-96b3-764b06dc5601"
           }
@@ -346,7 +346,7 @@
           "active": false,
           "left": 1649.9995,
           "top": 2259.6664,
-          "zIndex": 18,
+          "zIndex": 5,
           "widthName": 60,
           "widthComment": 60,
           "color": "#2196F3"

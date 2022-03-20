@@ -1,6 +1,6 @@
 package ent
 
-const MutationInput = `{{ define "mutation_input" }}
+const MutationInput = `{{ define "gql_mutation_input" }}
 
 {{- /*gotype: entgo.io/ent/entc/gen.Graph*/ -}}
 

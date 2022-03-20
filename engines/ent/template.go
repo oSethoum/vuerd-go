@@ -7,6 +7,16 @@ import (
 	"vuerd/types"
 )
 
+func countNonKeyFields(node types.Node) int {
+	count := 0
+	for _, field := range node.Fields {
+		if !field.Pk && !field.Fk && !field.Pfk {
+			count++
+		}
+	}
+	return count
+}
+
 func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 	files := []types.File{}
 	schemaBuffer := []string{
@@ -105,7 +115,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 								fmt.Sprintf("\t\t\"%s\"", helper.Pascal(enum)),
 								", ",
 								"\t"+strings.ToUpper(enum),
-								", ",
+								",",
 								"\n\t\t\t",
 							)
 						}
@@ -123,14 +133,6 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 					} else {
 						options = append(options, fmt.Sprintf("Default(%s)", field.Default))
 					}
-				}
-
-				if field.Name == "created_at" {
-					options = append(options, "Default(time.Now)", "Immutable()")
-				}
-
-				if field.Name == "updated_at" {
-					options = append(options, "Default(time.Now)", "UpdateDefault(time.Now)")
 				}
 
 				if field.Pk && field.Type == "UUID" {
@@ -153,6 +155,14 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 					}
 				}
 
+				if field.Name == "created_at" {
+					options = append(options, "Default(time.Now)", "Immutable()")
+				}
+
+				if field.Name == "updated_at" {
+					options = append(options, "Default(time.Now)", "UpdateDefault(time.Now)")
+				}
+
 			}
 
 			bodyBuffer = append(bodyBuffer, "\t}")
@@ -166,25 +176,30 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 			bodyBuffer = append(bodyBuffer, fmt.Sprintf("func (%s) Edges() []ent.Edge {", pascal))
 			bodyBuffer = append(bodyBuffer, "\treturn []ent.Edge{")
 
+			gqlOptions := ""
+			if config.Graphql {
+				gqlOptions = ".Annotations(entgql.Bind())"
+			}
+
 			for _, edge := range node.Edges {
 				if edge.Direction == "Out" {
 					switch edge.Type {
 					case "0..N":
 						{
 							bodyBuffer = append(bodyBuffer,
-								fmt.Sprintf("\t\tedge.To(\"%s\", %s.Type),", edge.Name, helper.Singular(helper.Pascal(edge.Name))),
+								fmt.Sprintf("\t\tedge.To(\"%s\", %s.Type)%s,", edge.Name, helper.Singular(helper.Pascal(edge.Name)), gqlOptions),
 							)
 						}
 					case "1..N":
 						{
 							bodyBuffer = append(bodyBuffer,
-								fmt.Sprintf("\t\tedge.To(\"%s\", %s.Type).Required(),", edge.Name, helper.Singular(helper.Pascal(edge.Name))),
+								fmt.Sprintf("\t\tedge.To(\"%s\", %s.Type)%s.Required(),", edge.Name, helper.Singular(helper.Pascal(edge.Name)), gqlOptions),
 							)
 						}
 					case "0..1", "1..1":
 						{
 							bodyBuffer = append(bodyBuffer,
-								fmt.Sprintf("\t\tedge.To(\"%s\", %s.Type).Unique(),", helper.Singular(edge.Name), helper.Singular(helper.Pascal(edge.Name))),
+								fmt.Sprintf("\t\tedge.To(\"%s\", %s.Type)%s.Unique(),", helper.Singular(edge.Name), helper.Singular(helper.Pascal(edge.Name)), gqlOptions),
 							)
 						}
 					}
@@ -194,9 +209,10 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 					case "0..N", "1..N":
 						{
 							bodyBuffer = append(bodyBuffer,
-								fmt.Sprintf("\t\tedge.From(\"%s\",%s.Type).Ref(\"%s\").Unique(),",
+								fmt.Sprintf("\t\tedge.From(\"%s\",%s.Type)%s.Ref(\"%s\").Unique(),",
 									helper.Singular(edge.Name),
 									helper.Singular(helper.Pascal(edge.Name)),
+									gqlOptions,
 									node.Name,
 								))
 
@@ -204,9 +220,10 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 					case "1..1":
 						{
 							bodyBuffer = append(bodyBuffer,
-								fmt.Sprintf("\t\tedge.From(\"%s\",%s.Type).Ref(\"%s\").Unique().Required(),",
+								fmt.Sprintf("\t\tedge.From(\"%s\",%s.Type)%s.Ref(\"%s\").Unique().Required(),",
 									helper.Singular(edge.Name),
 									helper.Singular(helper.Pascal(edge.Name)),
+									gqlOptions,
 									helper.Singular(node.Name),
 								),
 							)
@@ -215,9 +232,10 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 					case "0..1":
 						{
 							bodyBuffer = append(bodyBuffer,
-								fmt.Sprintf("\t\tedge.From(\"%s\",%s.Type).Ref(\"%s\").Unique(),",
+								fmt.Sprintf("\t\tedge.From(\"%s\",%s.Type)%s.Ref(\"%s\").Unique(),",
 									helper.Singular(edge.Name),
 									helper.Singular(helper.Pascal(edge.Name)),
+									gqlOptions,
 									helper.Singular(node.Name),
 								),
 							)
@@ -245,7 +263,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 		files = []types.File{
 			{
 				Buffer: strings.Join(schemaBuffer, "\n"),
-				Path:   "ent/schema.go",
+				Path:   "ent/schema/schema.go",
 			},
 		}
 	}
@@ -258,7 +276,7 @@ func GQL(nodes []types.Node) []types.File {
 	helper := engines.Helper{}
 	files = append(files, types.File{
 		Buffer: MutationInput,
-		Path:   "ent/template/mutation_input.tmpl",
+		Path:   "ent/template/gql_mutation_input.go.tmpl",
 	})
 
 	schemaBuffer := []string{}
@@ -285,24 +303,286 @@ func GQL(nodes []types.Node) []types.File {
 		"",
 	)
 
-	for _, node := range nodes {
+	queryBuffer := []string{"type Query {"}
+	mutationBuffer := []string{"type Mutation {"}
+	for _, n := range nodes {
+		pascal := helper.Pascal(helper.Singular(n.Name))
+		camels := helper.Camel(helper.Plural(n.Name))
 		buffer := []string{}
-		pascal := helper.Pascal(helper.Singular(node.Name))
+		orderInputsBuffer := []string{}
+		orderInputsBuffer = append(orderInputsBuffer,
+			fmt.Sprintf("input %sOrder {", pascal),
+			"\tdirection: OrderDirection!",
+			fmt.Sprintf("\tfield: %sOrderField", pascal),
+			"}",
+			"",
+		)
 
+		queryBuffer = append(queryBuffer, fmt.Sprintf("\t%s(input: %sQueryInput!):%sConnection!", camels, pascal, pascal))
+		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tcreate%s(input:Create%sInput!):%s!", pascal, pascal, pascal))
+		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tupdate%s(id:ID!,input:Update%sInput!):%s!", pascal, pascal, pascal))
+		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tdelete%s(id:ID!):%s!", pascal, pascal))
+
+		orderFieldEnumBuffer := []string{fmt.Sprintf("enum %sOrderField {", pascal)}
+		createInputBuffer := []string{fmt.Sprintf("input Create%sInput {", pascal)}
+		updateInputBuffer := []string{fmt.Sprintf("input Update%sInput {", pascal)}
+
+		buffer = append(buffer, fmt.Sprintf("type %s implements Node {", pascal))
+		buffer = append(buffer, "\tid: ID!")
+
+		for _, f := range n.Fields {
+			if !f.Nullable {
+				f.Type += "!"
+			}
+
+			if !f.Pk && !f.Fk && !f.Pfk {
+				if f.Type != "Json" {
+					orderFieldEnumBuffer = append(orderFieldEnumBuffer, "\t"+strings.ToUpper(helper.Snake(f.Name)))
+				}
+				createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%s: %s", helper.Camel(f.Name), f.Type))
+				updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\t%s: %s", helper.Camel(f.Name), f.Type))
+				buffer = append(buffer, fmt.Sprintf("\t%s: %s", helper.Camel(f.Name), f.Type))
+			}
+		}
+
+		for _, e := range n.Edges {
+			if e.Direction == "Out" {
+				switch e.Type {
+				case "0..N":
+					{
+						buffer = append(buffer, fmt.Sprintf("\t%s: [%s!]", helper.Camel(helper.Plural(e.Name)), helper.Pascal(helper.Singular(e.Name))))
+						createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%sIDs: [ID!]", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tadd%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tremove%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
+					}
+				case "1..N":
+					{
+						buffer = append(buffer, fmt.Sprintf("\t%s: [%s!]!", helper.Camel(helper.Plural(e.Name)), helper.Pascal(helper.Singular(e.Name))))
+						createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tadd%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tremove%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
+
+					}
+				case "1..1":
+					{
+						buffer = append(buffer, fmt.Sprintf("\t%s: %s!", helper.Singular(helper.Camel(e.Name)), helper.Singular(helper.Pascal(e.Name))))
+						createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%sID: ID!", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\t%sID: ID", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tClear%s: Boolean", helper.Pascal(helper.Singular(e.Name))))
+					}
+				case "0..1":
+					{
+						buffer = append(buffer, fmt.Sprintf("\t%s: %s", helper.Singular(helper.Camel(e.Name)), helper.Singular(helper.Pascal(e.Name))))
+						createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%sID: ID", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\t%sID: ID", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tClear%s: Boolean", helper.Pascal(helper.Singular(e.Name))))
+					}
+
+				}
+
+			} else {
+				switch e.Type {
+				case "0..N", "0..1":
+					{
+						buffer = append(buffer, fmt.Sprintf("\t%s: %s", helper.Singular(helper.Camel(e.Name)), helper.Singular(helper.Pascal(e.Name))))
+						createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%sID: ID", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\t%sID: ID", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tclear%s: Boolean", helper.Pascal(helper.Singular(e.Name))))
+					}
+				case "1..N", "1..1":
+					{
+						buffer = append(buffer, fmt.Sprintf("\t%s: %s!", helper.Singular(helper.Camel(e.Name)), helper.Singular(helper.Pascal(e.Name))))
+						createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%sID: ID", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\t%sID: ID", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tclear%s: Boolean", helper.Pascal(helper.Singular(e.Name))))
+					}
+				}
+
+			}
+		}
+		createInputBuffer = append(createInputBuffer, "}", "")
+		updateInputBuffer = append(updateInputBuffer, "}", "")
+		orderFieldEnumBuffer = append(orderFieldEnumBuffer, "}", "")
+
+		buffer = append(buffer, "}", "")
 		buffer = append(buffer,
-			fmt.Sprintf("type %s implements Node {", pascal))
-
+			fmt.Sprintf("type %sEdge {", pascal),
+			fmt.Sprintf("\tnode: %s", pascal),
+			"\tcursor: Cursor!",
+			"}",
+			"",
+			fmt.Sprintf("type %sConnection {", pascal),
+			"\ttotalCount: Int!",
+			"\tpageInfo: PageInfo!",
+			fmt.Sprintf("\tedges: [%sEdge]", pascal),
+			"}",
+			"",
+			fmt.Sprintf("input %sQueryInput {", pascal),
+			"\tafter: Cursor",
+			"\tfirst: Int",
+			"\tbefore: Cursor",
+			"\tlast: Int",
+			fmt.Sprintf("\torderBy: %sOrder", pascal),
+			fmt.Sprintf("\twhere: %sWhereInput", pascal),
+			"}",
+			"",
+		)
+		buffer = append(buffer, orderFieldEnumBuffer...)
+		buffer = append(buffer, createInputBuffer...)
+		buffer = append(buffer, updateInputBuffer...)
+		schemaBuffer = append(schemaBuffer, buffer...)
 	}
+
+	queryBuffer = append(queryBuffer, "}", "")
+	mutationBuffer = append(mutationBuffer, "}", "")
+
+	schemaBuffer = append(schemaBuffer, queryBuffer...)
+	schemaBuffer = append(schemaBuffer, mutationBuffer...)
+
+	// handlers
+	gqlhandlers := []string{
+		"package handlers",
+		"",
+		"import (",
+		"\t\"net/http\"",
+		"\t\"time\"",
+		"\t\"todo/ent\"",
+		"\t\"todo/graph\"",
+		"",
+		"\t\"entgo.io/contrib/entgql\"",
+		"\t\"github.com/99designs/gqlgen/graphql/handler\"",
+		"\t\"github.com/99designs/gqlgen/graphql/handler/extension\"",
+		"\t\"github.com/99designs/gqlgen/graphql/handler/transport\"",
+		"\t\"github.com/99designs/gqlgen/graphql/playground\"",
+		"\t\"github.com/gorilla/websocket\"",
+		"\t\"github.com/labstack/echo/v4\"",
+		")",
+		"",
+		"func PlaygroundHandler() echo.HandlerFunc {",
+		"\th := playground.Handler(\"GraphQL\", \"/query\")",
+		"",
+		"\treturn func(c echo.Context) error {",
+		"\t\th.ServeHTTP(c.Response(), c.Request())",
+		"\t\treturn nil",
+		"\t}",
+		"}",
+		"",
+		"func PlaygroundWsHandler() echo.HandlerFunc {",
+		"\th := playground.Handler(\"GraphQL WS\", \"/subscription\")",
+		"\treturn func(c echo.Context) error {",
+		"\t\th.ServeHTTP(c.Response(), c.Request())",
+		"\t\treturn nil",
+		"\t}",
+		"}",
+		"",
+		"func GraphqlHandlers(client *ent.Client) echo.HandlerFunc {",
+		"",
+		"\th := handler.NewDefaultServer(graph.NewSchema(client))",
+		"\th.Use(entgql.Transactioner{TxOpener: client})",
+		"\th.AddTransport(transport.POST{})",
+		"\th.AddTransport(&transport.Websocket{",
+		"\t\tKeepAlivePingInterval: 10 * time.Second,",
+		"\t\tUpgrader: websocket.Upgrader{",
+		"\t\t\tCheckOrigin: func(r *http.Request) bool {",
+		"\t\t\t\treturn true",
+		"\t\t\t},",
+		"\t\t},",
+		"\t})",
+		"\th.Use(extension.Introspection{})",
+		"\treturn func(c echo.Context) error {",
+		"\t\th.ServeHTTP(c.Response(), c.Request())",
+		"\t\treturn nil",
+		"\t}",
+		"}",
+		"",
+		"func GraphqlHandler(client *ent.Client) echo.HandlerFunc {",
+		"\th := handler.NewDefaultServer(graph.NewSchema(client))",
+		"\th.Use(entgql.Transactioner{TxOpener: client})",
+		"",
+		"\treturn func(c echo.Context) error {",
+		"\t\th.ServeHTTP(c.Response(), c.Request())",
+		"\t\treturn nil",
+		"\t}",
+		"}",
+		"",
+		"func GraphqlWsHandler(client *ent.Client) echo.HandlerFunc {",
+		"\th := handler.New(graph.NewSchema(client))",
+		"\th.AddTransport(transport.POST{})",
+		"\th.AddTransport(&transport.Websocket{",
+		"\t\tKeepAlivePingInterval: 10 * time.Second,",
+		"\t\tUpgrader: websocket.Upgrader{",
+		"\t\t\tCheckOrigin: func(r *http.Request) bool {",
+		"\t\t\t\treturn true",
+		"\t\t\t},",
+		"\t\t},",
+		"\t})",
+		"\th.Use(extension.Introspection{})",
+		"\treturn func(c echo.Context) error {",
+		"\t\th.ServeHTTP(c.Response(), c.Request())",
+		"\t\treturn nil",
+		"\t}",
+		"}",
+		"",
+	}
+
+	entcBuffer := []string{
+		"//go:build ignore",
+		"// +build ignore",
+		"",
+		"package main",
+		"",
+		"import (",
+		"\t\"log\"",
+		"",
+		"\t\"entgo.io/contrib/entgql\"",
+		"\t\"entgo.io/ent/entc\"",
+		"\t\"entgo.io/ent/entc/gen\"",
+		")",
+		"",
+		"func main() {",
+		"\tex, err := entgql.NewExtension(",
+		"\t\tentgql.WithWhereFilters(true),",
+		"\t\tentgql.WithConfigPath(\"../gqlgen.yml\"),",
+		"\t\tentgql.WithSchemaPath(\"../graph/ent.graphqls\"),",
+		"\t)",
+		"\tif err != nil {",
+		"\t\tlog.Fatalf(\"creating entgql extension: %v\", err)",
+		"\t}",
+		"\topts := []entc.Option{",
+		"\t\tentc.Extensions(ex),",
+		"\t\tentc.TemplateDir(\"./template\"),",
+		"\t}",
+		"\t",
+		"\tif err := entc.Generate(\"./schema\", &gen.Config{}, opts...); err != nil {",
+		"\t\tlog.Fatalf(\"running ent codegen: %v\", err)",
+		"\t}",
+		"}",
+	}
+
+	generateBuffer := []string{
+		"package ent",
+		"",
+		"//go:generate go run entc.go && gqlgen ../",
+	}
+
+	files = append(files,
+		types.File{
+			Buffer: strings.Join(schemaBuffer, "\n"),
+			Path:   "graph/schema.graphqls",
+		},
+		types.File{
+			Buffer: strings.Join(entcBuffer, "\n"),
+			Path:   "ent/entc.go",
+		},
+		types.File{
+			Buffer: strings.Join(generateBuffer, "\n"),
+			Path:   "ent/generate.go",
+		},
+		types.File{
+			Buffer: strings.Join(gqlhandlers, "\n"),
+			Path:   "handlers/gql.go",
+		},
+	)
 
 	return files
-}
-
-func countNonKeyFields(node types.Node) int {
-	count := 0
-	for _, field := range node.Fields {
-		if !field.Pk && !field.Fk && !field.Pfk {
-			count++
-		}
-	}
-	return count
 }

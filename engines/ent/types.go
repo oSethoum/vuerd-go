@@ -16,6 +16,22 @@ var EntTypes = map[string]string{
 	"time":     "Time",
 }
 
+var GQLTypes = map[string]string{
+	"int":      "Int",
+	"long":     "Int",
+	"float":    "Float",
+	"uuid":     "ID",
+	"double":   "Float",
+	"decimal":  "Int",
+	"boolean":  "Boolean",
+	"string":   "String",
+	"lob":      "String",
+	"date":     "Time",
+	"json":     "Json",
+	"datetime": "Time",
+	"time":     "Time",
+}
+
 type SchemaConfig struct {
 	Graphql    bool
 	SingleFile bool

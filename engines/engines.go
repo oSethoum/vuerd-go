@@ -77,6 +77,7 @@ func Simplify(state types.State, t map[string]string, m map[string]string, c fun
 		node := types.Node{}
 		node.Name = table.Name
 		node.ID = table.Id
+		node.Comment = table.Comment
 
 		for _, column := range table.Columns {
 			node.Fields = append(node.Fields, types.Field{

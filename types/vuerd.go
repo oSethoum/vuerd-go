@@ -83,10 +83,11 @@ type IndexColumn struct {
 }
 
 type Node struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Fields []Field `json:"fields"`
-	Edges  []Edge  `json:"edges"`
+	ID      string  `json:"id"`
+	Name    string  `json:"name"`
+	Comment string  `json:"comment"`
+	Fields  []Field `json:"fields"`
+	Edges   []Edge  `json:"edges"`
 }
 
 type Edge struct {
