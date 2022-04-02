@@ -23,7 +23,7 @@ var GQLTypes = map[string]string{
 	"uuid":     "ID",
 	"double":   "Float",
 	"decimal":  "Int",
-	"boolean":  "Boolean",
+	"boolean":  "Bool",
 	"string":   "String",
 	"lob":      "String",
 	"date":     "Time",

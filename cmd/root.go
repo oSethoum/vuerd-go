@@ -48,8 +48,6 @@ func vuerdCmd() {
 	var state types.State
 	utils.ReadJSON(&state, dbPath)
 
-	fmt.Printf("%v", state)
-
 	switch schema {
 	case "ent":
 		ent.Ent(state, pkg)
