@@ -37,9 +37,9 @@ func vuerdCmd() {
 		errorMsg: "Please enter the package name of your project",
 	})
 
-	dbType := promptGetSelect(promptContent{
-		label: "Select the type of your database",
-	}, []string{"mysql", "postgres", "sqlite"})
+	// dbType := promptGetSelect(promptContent{
+	// 	label: "Select the type of your database",
+	// }, []string{"mysql", "postgres", "sqlite"})
 
 	schema := promptGetSelect(promptContent{
 		label: "Select ORM:",
