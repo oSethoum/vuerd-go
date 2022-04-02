@@ -7,7 +7,7 @@ var EntTypes = map[string]string{
 	"uuid":     "UUID",
 	"double":   "Float64",
 	"decimal":  "Int",
-	"boolean":  "Boolean",
+	"boolean":  "Bool",
 	"string":   "String",
 	"lob":      "String",
 	"date":     "Time",
