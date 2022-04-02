@@ -407,7 +407,7 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 						buffer = append(buffer, fmt.Sprintf("\t%s: [%s!]", helper.Camel(helper.Plural(e.Name)), helper.Pascal(helper.Singular(e.Name))))
 						createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%sIDs: [ID!]", helper.Camel(helper.Singular(e.Name))))
 						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tadd%sIDs: [ID!]!", helper.Pascal(helper.Singular(e.Name))))
-						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tremove%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tremove%sIDs: [ID!]!", helper.Pascal(helper.Singular(e.Name))))
 					}
 				case "1..N":
 					{
