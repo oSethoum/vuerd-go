@@ -12,7 +12,7 @@ func Schema(nodes []types.Node, provider string) types.File {
 	var helper engines.Helper
 
 	buffer = append(buffer,
-		"database db {",
+		"datasource db {",
 		"\turl = env(\"DATABASE_URL\")",
 		fmt.Sprintf("\tprovider = \"%s\"", provider),
 		"}",
@@ -46,7 +46,7 @@ func Schema(nodes []types.Node, provider string) types.File {
 			}
 
 			if field.AutoIncrement {
-				options = append(options, "@default(@autoincrement())")
+				options = append(options, "@default(autoincrement())")
 			} else if field.Name == "createdAt" {
 				options = append(options, "@default(now())")
 			} else {
@@ -113,7 +113,7 @@ func Schema(nodes []types.Node, provider string) types.File {
 					}
 				case "0..1", "0..N":
 					{
-						buffer = append(buffer, fmt.Sprintf("\t%s %s @relation(fields:[%s], references:[%s])",
+						buffer = append(buffer, fmt.Sprintf("\t%s %s? @relation(fields:[%s], references:[%s])",
 							strings.TrimSuffix(edge.Field.Name, "Id"),
 							helper.Pascal(helper.Singular(edge.Name)),
 							edge.Field.Name,

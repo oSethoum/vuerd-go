@@ -11,11 +11,11 @@ func WriteFile(file types.File, dir *string) error {
 		file.Path = path.Join(*dir, file.Path)
 	}
 	folder := path.Dir(file.Path)
-	err := os.MkdirAll(folder, os.ModeAppend)
+	err := os.MkdirAll(folder, 0666)
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(file.Path, []byte(file.Buffer), os.ModeAppend)
+	err = os.WriteFile(file.Path, []byte(file.Buffer), 0666)
 	if err != nil {
 		return err
 	}

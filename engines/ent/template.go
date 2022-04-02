@@ -17,6 +17,15 @@ func countNonKeyFields(node types.Node) int {
 	return count
 }
 
+func hasEdges(nodes []types.Node) bool {
+	for _, n := range nodes {
+		if len(n.Edges) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 	files := []types.File{}
 	schemaBuffer := []string{
@@ -24,14 +33,20 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 		"",
 		"import (",
 		"\t\"time\"",
-		"\t\"entgo/ent\"",
-		"\t\"entgo/ent/dialect/entsql\"",
-		"\t\"entgo/ent/schema/field\"",
+		"\t\"entgo.io/ent\"",
+		"\t\"entgo.io/ent/schema\"",
+		"\t\"entgo.io/ent/dialect/entsql\"",
+		"\t\"entgo.io/ent/schema/field\"",
 	}
 
 	if config.Graphql {
 		schemaBuffer = append(schemaBuffer, "\t\"entgo.io/contrib/entgql\"")
 	}
+
+	if hasEdges(nodes) {
+		schemaBuffer = append(schemaBuffer, "\t\"entgo.io/ent/schema/edge\"")
+	}
+
 	schemaBuffer = append(schemaBuffer, "", ")")
 	helper := engines.Helper{}
 
@@ -44,10 +59,10 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 			"",
 			"import (",
 			"\t\"time\"",
-			"\t\"entgo/ent\"",
-			"\t\"entgo/ent/dialect/entsql\"",
-			"\t\"entgo/ent/schema/field\"",
-			"\t\"entgo/ent/dialect/entsql/edge\"",
+			"\t\"entgo.io/ent\"",
+			"\t\"entgo.io/ent/dialect/entsql\"",
+			"\t\"entgo.io/ent/schema\"",
+			"\t\"entgo.io/ent/schema/field\"",
 			")",
 		)
 
@@ -56,7 +71,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 		}
 
 		if len(node.Edges) > 0 {
-			buffer = append(buffer, "\t\"entgo/ent/dialect/entsql/edge\"")
+			buffer = append(buffer, "\t\"entgo.io/ent/schema/edge\"")
 		}
 		buffer = append(buffer, ")")
 
@@ -73,7 +88,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 		// annotation
 		bodyBuffer = append(bodyBuffer,
 			fmt.Sprintf("// %s Annotations", pascal),
-			fmt.Sprintf("func (%s) Annotations() []schema.Anotation {", pascal),
+			fmt.Sprintf("func (%s) Annotations() []schema.Annotation {", pascal),
 			"\treturn []schema.Annotation {",
 			fmt.Sprintf("\t\tentsql.Annotation {Table: \"%s\"},", node.Name),
 			"\t}",
@@ -102,7 +117,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 
 				if field.Nullable {
 					options = append(options, "Optional()", "Nillable()")
-				} else {
+				} else if field.Type == "String" {
 					options = append(options, "NotEmpty()")
 				}
 
@@ -139,28 +154,27 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 					bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.%s(\"id\", uuid.UUID{}).%s", field.Type, strings.Join(options, ".\n\t")))
 				}
 
-				if config.Graphql {
-					options = append(options, fmt.Sprintf("Annotation(entql.OrderField(\"%s\")),", strings.ToUpper(field.Name)))
-				}
-
-				if !field.Pk && !field.Fk && !field.Pfk {
-					if field.Type == "UUID" {
-						bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.%s(\"%s\", uuid.UUID{}).%s", field.Type, field.Name, strings.Join(options, ".\n\t\t\t")))
-					} else if field.Type == "Json" {
-						// bodyBuffer = append(bodyBuffer, fmt.Sprintf("field.%s(\"%s\").%s", field.Type, field.Name, strings.Join(options, ".\n\t")))
-					} else if strings.HasPrefix(field.Type, "Enum") {
-						bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.Enum(\"%s\", uuid.UUID{}).%s", field.Name, strings.Join(options, ".\n\t\t\t")))
-					} else {
-						bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.%s(\"%s\").%s", field.Type, field.Name, strings.Join(options, ".\n\t\t\t")))
-					}
-				}
-
 				if field.Name == "created_at" {
 					options = append(options, "Default(time.Now)", "Immutable()")
 				}
 
 				if field.Name == "updated_at" {
 					options = append(options, "Default(time.Now)", "UpdateDefault(time.Now)")
+				}
+				if config.Graphql {
+					options = append(options, fmt.Sprintf("Annotations(entgql.OrderField(\"%s\"))", strings.ToUpper(field.Name)))
+				}
+
+				if !field.Pk && !field.Fk && !field.Pfk {
+					if field.Type == "UUID" {
+						bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.%s(\"%s\", uuid.UUID{}).%s,", field.Type, field.Name, strings.Join(options, ".\n\t\t\t")))
+					} else if field.Type == "Json" {
+						// bodyBuffer = append(bodyBuffer, fmt.Sprintf("field.%s(\"%s\").%s", field.Type, field.Name, strings.Join(options, ".\n\t")))
+					} else if strings.HasPrefix(field.Type, "Enum") {
+						bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.Enum(\"%s\", uuid.UUID{}).%s,", field.Name, strings.Join(options, ".\n\t\t\t")))
+					} else {
+						bodyBuffer = append(bodyBuffer, fmt.Sprintf("\t\tfield.%s(\"%s\").%s,", field.Type, field.Name, strings.Join(options, ".\n\t\t\t")))
+					}
 				}
 
 			}
@@ -268,10 +282,46 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 		}
 	}
 
+	dbFile := []string{
+		"package db",
+		"",
+		"import (",
+		"	\"context\"",
+		"	\"log\"",
+		"	\"manage/ent\"",
+		"	\"manage/ent/migrate\"",
+		"",
+		"	\"entgo.io/ent/dialect\"",
+		"	_ \"github.com/mattn/go-sqlite3\"",
+		")",
+		"",
+		"func Init() *ent.Client {",
+		"	// Create ent.Client and run the schema migration.",
+		"	client, err := ent.Open(dialect.SQLite, \"file:ent.sqlite?_fk=1\")",
+		"	if err != nil {",
+		"		log.Fatal(\"opening ent client\", err)",
+		"	}",
+		"	if err := client.Schema.Create(",
+		"		context.Background(),",
+		"		migrate.WithGlobalUniqueID(true),",
+		"	); err != nil {",
+		"		log.Fatal(\"opening ent client\", err)",
+		"	}",
+		"",
+		"	return client",
+		"}",
+	}
+
+	files = append(files, types.File{
+		Buffer: strings.Join(dbFile, "\n"),
+		Path:   "db/db.go",
+	})
+
 	return files
 }
 
-func GQL(nodes []types.Node) []types.File {
+// TODO: support enums
+func GQL(nodes []types.Node, pkg string) []types.File {
 	files := []types.File{}
 	helper := engines.Helper{}
 	files = append(files, types.File{
@@ -307,6 +357,7 @@ func GQL(nodes []types.Node) []types.File {
 	mutationBuffer := []string{"type Mutation {"}
 	for _, n := range nodes {
 		pascal := helper.Pascal(helper.Singular(n.Name))
+		pascals := helper.Pascal(helper.Plural(n.Name))
 		camels := helper.Camel(helper.Plural(n.Name))
 		buffer := []string{}
 		orderInputsBuffer := []string{}
@@ -318,10 +369,13 @@ func GQL(nodes []types.Node) []types.File {
 			"",
 		)
 
-		queryBuffer = append(queryBuffer, fmt.Sprintf("\t%s(input: %sQueryInput!):%sConnection!", camels, pascal, pascal))
+		queryBuffer = append(queryBuffer, fmt.Sprintf("\t%s(\n\tafter: Cursor \n\tfirst: Int \n\tbefore: Cursor \n\tlast: Int \n\torderBy: %sOrder \n\t#where: %sWhereInput\n\t):%sConnection!", camels, pascal, pascal, pascal), "")
 		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tcreate%s(input:Create%sInput!):%s!", pascal, pascal, pascal))
+		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tcreate%s(input:[Create%sInput!]!):[%s!]!", pascals, pascal, pascal))
 		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tupdate%s(id:ID!,input:Update%sInput!):%s!", pascal, pascal, pascal))
+		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tupdate%s(ids:[ID!]!,input:[Update%sInput!]!):[%s!]!", pascals, pascal, pascal))
 		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tdelete%s(id:ID!):%s!", pascal, pascal))
+		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tdelete%s(ids:[ID!]!):[%s!]!", pascals, pascal), "")
 
 		orderFieldEnumBuffer := []string{fmt.Sprintf("enum %sOrderField {", pascal)}
 		createInputBuffer := []string{fmt.Sprintf("input Create%sInput {", pascal)}
@@ -335,7 +389,7 @@ func GQL(nodes []types.Node) []types.File {
 				f.Type += "!"
 			}
 
-			if !f.Pk && !f.Fk && !f.Pfk {
+			if !f.Pk && !f.Fk && !f.Pfk && f.Name != "created_at" && f.Name != "updated_at" {
 				if f.Type != "Json" {
 					orderFieldEnumBuffer = append(orderFieldEnumBuffer, "\t"+strings.ToUpper(helper.Snake(f.Name)))
 				}
@@ -352,15 +406,15 @@ func GQL(nodes []types.Node) []types.File {
 					{
 						buffer = append(buffer, fmt.Sprintf("\t%s: [%s!]", helper.Camel(helper.Plural(e.Name)), helper.Pascal(helper.Singular(e.Name))))
 						createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%sIDs: [ID!]", helper.Camel(helper.Singular(e.Name))))
-						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tadd%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tadd%sIDs: [ID!]!", helper.Pascal(helper.Singular(e.Name))))
 						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tremove%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
 					}
 				case "1..N":
 					{
 						buffer = append(buffer, fmt.Sprintf("\t%s: [%s!]!", helper.Camel(helper.Plural(e.Name)), helper.Pascal(helper.Singular(e.Name))))
 						createInputBuffer = append(createInputBuffer, fmt.Sprintf("\t%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
-						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tadd%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
-						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tremove%sIDs: [ID!]!", helper.Camel(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tadd%sIDs: [ID!]!", helper.Pascal(helper.Singular(e.Name))))
+						updateInputBuffer = append(updateInputBuffer, fmt.Sprintf("\tremove%sIDs: [ID!]!", helper.Pascal(helper.Singular(e.Name))))
 
 					}
 				case "1..1":
@@ -417,21 +471,18 @@ func GQL(nodes []types.Node) []types.File {
 			fmt.Sprintf("\tedges: [%sEdge]", pascal),
 			"}",
 			"",
-			fmt.Sprintf("input %sQueryInput {", pascal),
-			"\tafter: Cursor",
-			"\tfirst: Int",
-			"\tbefore: Cursor",
-			"\tlast: Int",
-			fmt.Sprintf("\torderBy: %sOrder", pascal),
-			fmt.Sprintf("\twhere: %sWhereInput", pascal),
-			"}",
-			"",
 		)
 		buffer = append(buffer, orderFieldEnumBuffer...)
+		buffer = append(buffer, orderInputsBuffer...)
 		buffer = append(buffer, createInputBuffer...)
 		buffer = append(buffer, updateInputBuffer...)
 		schemaBuffer = append(schemaBuffer, buffer...)
 	}
+
+	queryBuffer = append(queryBuffer,
+		"\tnode(id: ID!): Node",
+		"\tnodes(ids: [ID!]!): [Node]!",
+	)
 
 	queryBuffer = append(queryBuffer, "}", "")
 	mutationBuffer = append(mutationBuffer, "}", "")
@@ -446,8 +497,8 @@ func GQL(nodes []types.Node) []types.File {
 		"import (",
 		"\t\"net/http\"",
 		"\t\"time\"",
-		"\t\"todo/ent\"",
-		"\t\"todo/graph\"",
+		fmt.Sprintf("\t\"%s/ent\"", pkg),
+		fmt.Sprintf("\t\"%s/graph\"", pkg),
 		"",
 		"\t\"entgo.io/contrib/entgql\"",
 		"\t\"github.com/99designs/gqlgen/graphql/handler\"",
@@ -562,7 +613,94 @@ func GQL(nodes []types.Node) []types.File {
 	generateBuffer := []string{
 		"package ent",
 		"",
-		"//go:generate go run entc.go && gqlgen ../",
+		"//go:generate go run entc.go",
+	}
+
+	ymlFile := []string{
+		"schema:",
+		" - graph/*.graphqls",
+		"",
+		"exec:",
+		" filename: graph/generated/generated.go",
+		" package: generated",
+		"",
+		"resolver:",
+		" layout: follow-schema",
+		" dir: graph",
+		" package: graph",
+		"",
+		"autobind:",
+		" - " + pkg + "/ent",
+		"",
+		"models:",
+		" ID:",
+		"  model:",
+		"   - github.com/99designs/gqlgen/graphql.IntID",
+		" Node:",
+		"  model:",
+		"   - " + pkg + "/ent.Noder",
+		"",
+	}
+
+	gqlRoute := []string{
+		"package routes",
+		"",
+		"import (",
+		"	\"" + pkg + "/ent\"",
+		"	\"" + pkg + "/handlers\"",
+		"",
+		"	\"github.com/labstack/echo/v4\"",
+		")",
+		"",
+		"func GqlInit(e *echo.Echo, client *ent.Client) {",
+		"	e.GET(\"/\", handlers.PlaygroundHandler())",
+		"	//e.POST(\"/query\", handlers.GraphqlHandler(client))",
+		"	e.Any(\"/query\", handlers.GraphqlHandlers(client))",
+		"	e.Any(\"/subscriptions\", handlers.GraphqlWsHandler(client))",
+		"",
+		"	e.GET(\"/ws\", handlers.PlaygroundWsHandler())",
+		"}",
+	}
+
+	main := []string{
+		"package main",
+		"",
+		"import (",
+		"	\"" + pkg + "/db\"",
+		"	\"" + pkg + "/routes\"",
+		"",
+		"	\"github.com/labstack/echo/v4\"",
+		"	\"github.com/labstack/echo/v4/middleware\"",
+		")",
+		"",
+		"func main() {",
+		"	e := echo.New()",
+		"",
+		"	// Middleware",
+		"	e.Use(middleware.Logger())",
+		"	e.Use(middleware.Recover())",
+		"",
+		"	client := db.Init()",
+		"	defer client.Close()",
+		"",
+		"	routes.Init(e, client)",
+		"",
+		"	e.Logger.Fatal(e.Start(\":3001\"))",
+		"}",
+	}
+
+	routes := []string{
+		"package routes",
+		"",
+		"import (",
+		"	\"" + pkg + "/ent\"",
+		"",
+		"	\"github.com/labstack/echo/v4\"",
+		")",
+		"",
+		"func Init(e *echo.Echo, client *ent.Client) {",
+		"	GqlInit(e, client)",
+		"}",
 	}
 
 	files = append(files,
@@ -581,6 +719,22 @@ func GQL(nodes []types.Node) []types.File {
 		types.File{
 			Buffer: strings.Join(gqlhandlers, "\n"),
 			Path:   "handlers/gql.go",
+		},
+		types.File{
+			Buffer: strings.Join(ymlFile, "\n"),
+			Path:   "gqlgen.yml",
+		},
+		types.File{
+			Buffer: strings.Join(gqlRoute, "\n"),
+			Path:   "routes/gql.go",
+		},
+		types.File{
+			Buffer: strings.Join(main, "\n"),
+			Path:   "main.go",
+		},
+		types.File{
+			Buffer: strings.Join(routes, "\n"),
+			Path:   "routes/routes.go",
 		},
 	)
 
