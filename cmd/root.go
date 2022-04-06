@@ -6,6 +6,7 @@ import (
 	"os"
 	"vuerd/engines/ent"
 	"vuerd/engines/prisma"
+	"vuerd/engines/typeorm"
 	"vuerd/types"
 	"vuerd/utils"
 
@@ -17,7 +18,10 @@ var rootCmd = &cobra.Command{
 	Use:   "vuerd",
 	Short: "Generate API based on your ERD diagram ( vuerd vscode extension )",
 	Run: func(cmd *cobra.Command, args []string) {
-		vuerdCmd()
+		// var state types.State
+		// utils.ReadJSON(&state, "db/db.vuerd.json")
+		// typeorm.Engine(state)
+		VuerdCmd()
 	},
 }
 
@@ -26,33 +30,53 @@ type promptContent struct {
 	label    string
 }
 
-func vuerdCmd() {
+func VuerdCmd() {
 	dbPath := promptGetInput(promptContent{
-		label:    "Enter the path of your database ",
-		errorMsg: "Please enter the path of your database ",
+		label:    "Enter the path for your database.vuerd.json file",
+		errorMsg: "Please Enter the path for your database.vuerd.json file",
 	})
 
-	pkg := promptGetInput(promptContent{
-		label:    "Enter the package name of your project",
-		errorMsg: "Please enter the package name of your project",
-	})
+	language := promptGetSelect(promptContent{
+		label:    "Select the language of your project",
+		errorMsg: "Please select the language of your project",
+	}, []string{"go", "ts"})
 
 	// dbType := promptGetSelect(promptContent{
 	// 	label: "Select the type of your database",
 	// }, []string{"mysql", "postgres", "sqlite"})
 
-	schema := promptGetSelect(promptContent{
-		label: "Select ORM:",
-	}, []string{"ent", "prisma"})
-
 	var state types.State
 	utils.ReadJSON(&state, dbPath)
 
-	switch schema {
-	case "ent":
-		ent.Ent(state, pkg)
-	case "prisma":
-		prisma.Prisma(state)
+	if language == "go" {
+		pkg := promptGetInput(promptContent{
+			label:    "Enter the package name of your project",
+			errorMsg: "Please enter the package name of your project",
+		})
+
+		schema := promptGetSelect(promptContent{
+			label:    "Select ORM:",
+			errorMsg: "please select ORM",
+		}, []string{"ent"})
+
+		switch schema {
+		case "ent":
+			ent.Ent(state, pkg)
+		}
+	}
+
+	if language == "ts" {
+		schema := promptGetSelect(promptContent{
+			label:    "Select ORM:",
+			errorMsg: "please select ORM",
+		}, []string{"typeorm", "prisma"})
+
+		switch schema {
+		case "typeorm":
+			typeorm.Engine(state)
+		case "prisma":
+			prisma.Prisma(state)
+		}
 	}
 }
 
