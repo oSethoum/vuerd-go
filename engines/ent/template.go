@@ -26,7 +26,7 @@ func hasEdges(nodes []types.Node) bool {
 	return false
 }
 
-func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
+func Schema(nodes []types.Node, config *SchemaConfig, pkg string) []types.File {
 	files := []types.File{}
 	schemaBuffer := []string{
 		"package schema",
@@ -257,7 +257,6 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 					}
 				}
 			}
-
 			bodyBuffer = append(bodyBuffer, "\t}", "}", "")
 		}
 
@@ -288,8 +287,8 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 		"import (",
 		"	\"context\"",
 		"	\"log\"",
-		"	\"manage/ent\"",
-		"	\"manage/ent/migrate\"",
+		fmt.Sprintf("	\"%s/ent\"", pkg),
+		fmt.Sprintf("	\"%s/ent/migrate\"", pkg),
 		"",
 		"	\"entgo.io/ent/dialect\"",
 		"	_ \"github.com/mattn/go-sqlite3\"",
@@ -321,7 +320,7 @@ func Schema(nodes []types.Node, config *SchemaConfig) []types.File {
 }
 
 // TODO: support enums
-func GQL(nodes []types.Node, pkg string) []types.File {
+func GQL(nodes []types.Node, pkg string, wherePrefix string) []types.File {
 	files := []types.File{}
 	helper := engines.Helper{}
 	files = append(files, types.File{
@@ -354,10 +353,12 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 	)
 
 	queryBuffer := []string{"type Query {"}
-	mutationBuffer := []string{"type Mutation {"}
+
 	for _, n := range nodes {
+
 		pascal := helper.Pascal(helper.Singular(n.Name))
 		pascals := helper.Pascal(helper.Plural(n.Name))
+		snakes := helper.Snake(helper.Plural(n.Name))
 		camels := helper.Camel(helper.Plural(n.Name))
 		buffer := []string{}
 		orderInputsBuffer := []string{}
@@ -369,13 +370,19 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 			"",
 		)
 
-		queryBuffer = append(queryBuffer, fmt.Sprintf("\t%s(\n\tafter: Cursor \n\tfirst: Int \n\tbefore: Cursor \n\tlast: Int \n\torderBy: %sOrder \n\t#where: %sWhereInput\n\t):%sConnection!", camels, pascal, pascal, pascal), "")
-		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tcreate%s(input:Create%sInput!):%s!", pascal, pascal, pascal))
-		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tcreate%s(input:[Create%sInput!]!):[%s!]!", pascals, pascal, pascal))
-		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tupdate%s(id:ID!,input:Update%sInput!):%s!", pascal, pascal, pascal))
-		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tupdate%s(ids:[ID!]!,input:[Update%sInput!]!):[%s!]!", pascals, pascal, pascal))
-		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tdelete%s(id:ID!):%s!", pascal, pascal))
-		mutationBuffer = append(mutationBuffer, fmt.Sprintf("\tdelete%s(ids:[ID!]!):[%s!]!", pascals, pascal), "")
+		nodeQueryBuffer := []string{"extend type Query {"}
+		nodeMutationBuffer := []string{"extend type Mutation {"}
+
+		nodeQueryBuffer = append(nodeQueryBuffer, fmt.Sprintf("\t%s(\n\tafter: Cursor \n\tfirst: Int \n\tbefore: Cursor \n\tlast: Int \n\torderBy: %sOrder \n\t%swhere: %sWhereInput\n\t):%sConnection!", camels, pascal, wherePrefix, pascal, pascal), "")
+		nodeMutationBuffer = append(nodeMutationBuffer, fmt.Sprintf("\tcreate%s(input:Create%sInput!):%s!", pascal, pascal, pascal))
+		nodeMutationBuffer = append(nodeMutationBuffer, fmt.Sprintf("\tcreate%s(input:[Create%sInput!]!):[%s!]!", pascals, pascal, pascal))
+		nodeMutationBuffer = append(nodeMutationBuffer, fmt.Sprintf("\tupdate%s(id:ID!,input:Update%sInput!):%s!", pascal, pascal, pascal))
+		nodeMutationBuffer = append(nodeMutationBuffer, fmt.Sprintf("\tupdate%s(ids:[ID!]!,input:[Update%sInput!]!):[%s!]!", pascals, pascal, pascal))
+		nodeMutationBuffer = append(nodeMutationBuffer, fmt.Sprintf("\tdelete%s(id:ID!):%s!", pascal, pascal))
+		nodeMutationBuffer = append(nodeMutationBuffer, fmt.Sprintf("\tdelete%s(ids:[ID!]!):[%s!]!", pascals, pascal), "")
+
+		nodeQueryBuffer = append(nodeQueryBuffer, "}", "")
+		nodeMutationBuffer = append(nodeMutationBuffer, "}", "")
 
 		orderFieldEnumBuffer := []string{fmt.Sprintf("enum %sOrderField {", pascal)}
 		createInputBuffer := []string{fmt.Sprintf("input Create%sInput {", pascal)}
@@ -476,7 +483,15 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 		buffer = append(buffer, orderInputsBuffer...)
 		buffer = append(buffer, createInputBuffer...)
 		buffer = append(buffer, updateInputBuffer...)
-		schemaBuffer = append(schemaBuffer, buffer...)
+
+		buffer = append(buffer, nodeQueryBuffer...)
+		buffer = append(buffer, nodeMutationBuffer...)
+
+		files = append(files, types.File{
+			Path:   fmt.Sprintf("graph/schemas/%s.graphqls", snakes),
+			Buffer: strings.Join(buffer, "\n"),
+		})
+
 	}
 
 	queryBuffer = append(queryBuffer,
@@ -485,10 +500,8 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 	)
 
 	queryBuffer = append(queryBuffer, "}", "")
-	mutationBuffer = append(mutationBuffer, "}", "")
 
 	schemaBuffer = append(schemaBuffer, queryBuffer...)
-	schemaBuffer = append(schemaBuffer, mutationBuffer...)
 
 	// handlers
 	gqlhandlers := []string{
@@ -498,7 +511,7 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 		"\t\"net/http\"",
 		"\t\"time\"",
 		fmt.Sprintf("\t\"%s/ent\"", pkg),
-		fmt.Sprintf("\t\"%s/graph\"", pkg),
+		fmt.Sprintf("\t\"%s/graph/resolvers\"", pkg),
 		"",
 		"\t\"entgo.io/contrib/entgql\"",
 		"\t\"github.com/99designs/gqlgen/graphql/handler\"",
@@ -528,7 +541,7 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 		"",
 		"func GraphqlHandlers(client *ent.Client) echo.HandlerFunc {",
 		"",
-		"\th := handler.NewDefaultServer(graph.NewSchema(client))",
+		"\th := handler.NewDefaultServer(resolvers.NewSchema(client))",
 		"\th.Use(entgql.Transactioner{TxOpener: client})",
 		"\th.AddTransport(transport.POST{})",
 		"\th.AddTransport(&transport.Websocket{",
@@ -547,7 +560,7 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 		"}",
 		"",
 		"func GraphqlHandler(client *ent.Client) echo.HandlerFunc {",
-		"\th := handler.NewDefaultServer(graph.NewSchema(client))",
+		"\th := handler.NewDefaultServer(resolvers.NewSchema(client))",
 		"\th.Use(entgql.Transactioner{TxOpener: client})",
 		"",
 		"\treturn func(c echo.Context) error {",
@@ -557,7 +570,7 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 		"}",
 		"",
 		"func GraphqlWsHandler(client *ent.Client) echo.HandlerFunc {",
-		"\th := handler.New(graph.NewSchema(client))",
+		"\th := handler.New(resolvers.NewSchema(client))",
 		"\th.AddTransport(transport.POST{})",
 		"\th.AddTransport(&transport.Websocket{",
 		"\t\tKeepAlivePingInterval: 10 * time.Second,",
@@ -594,7 +607,7 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 		"\tex, err := entgql.NewExtension(",
 		"\t\tentgql.WithWhereFilters(true),",
 		"\t\tentgql.WithConfigPath(\"../gqlgen.yml\"),",
-		"\t\tentgql.WithSchemaPath(\"../graph/ent.graphqls\"),",
+		"\t\tentgql.WithSchemaPath(\"../graph/schemas/ent.graphqls\"),",
 		"\t)",
 		"\tif err != nil {",
 		"\t\tlog.Fatalf(\"creating entgql extension: %v\", err)",
@@ -614,11 +627,12 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 		"package ent",
 		"",
 		"//go:generate go run entc.go",
+		"",
 	}
 
 	ymlFile := []string{
 		"schema:",
-		" - graph/*.graphqls",
+		" - graph/schemas/*.graphqls",
 		"",
 		"exec:",
 		" filename: graph/generated/generated.go",
@@ -626,8 +640,8 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 		"",
 		"resolver:",
 		" layout: follow-schema",
-		" dir: graph",
-		" package: graph",
+		" dir: graph/resolvers",
+		" package: resolvers",
 		"",
 		"autobind:",
 		" - " + pkg + "/ent",
@@ -706,7 +720,7 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 	files = append(files,
 		types.File{
 			Buffer: strings.Join(schemaBuffer, "\n"),
-			Path:   "graph/schema.graphqls",
+			Path:   "graph/schemas/schema.graphqls",
 		},
 		types.File{
 			Buffer: strings.Join(entcBuffer, "\n"),
@@ -738,5 +752,53 @@ func GQL(nodes []types.Node, pkg string) []types.File {
 		},
 	)
 
+	return files
+}
+
+func Resolvers(nodes []types.Node, pkg string) []types.File {
+	files := []types.File{}
+
+	resolverBuffer := []string{
+		"package resolvers",
+		"",
+		"import (",
+		"	\"" + pkg + "/ent\"",
+		"github.com/99designs/gqlgen/graphql",
+		")",
+		"",
+		"type Resolver struct {",
+		"	client *ent.Client",
+		"",
+		"var schema *graphql.ExecutableSchema",
+		"",
+		"func (client *ent.Client) graphql.ExecutableSchema {",
+		" if schema == nil {",
+		" schema = new(graphql.ExecutableSchema)",
+		" *schema = generated.NewExecutableSchema(generated.Config{Resolvers: &Resolver{",
+		"	client: client,",
+		"}})",
+		"}",
+		"return *schema",
+		"}",
+	}
+
+	files = append(files, types.File{
+		Path:   "./graph/resolvers/resolver.go",
+		Buffer: strings.Join(resolverBuffer, "\n"),
+	})
+
+	// for _, node := range nodes {
+	// 	resolverBuffer := []string{
+	// 		"package resolvers",
+	// 		"",
+	// 		"import (",
+	// 		" fmt",
+	// 		" context",
+	// 		"	\"" + pkg + "/ent\"",
+	// 		"	\"" + pkg + "/graph/generated\"",
+	// 		")",
+	// 		"",
+	// 	}
+	// }
 	return files
 }
