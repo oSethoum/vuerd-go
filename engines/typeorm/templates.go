@@ -147,39 +147,57 @@ func GraphQL(nodes []types.Node) []types.File {
 		pascal := h.Pascal(h.Singular(n.Name))
 		camel := h.Camel(h.Singular(n.Name))
 		camels := h.Camel(h.Plural(n.Name))
-		importsMap := map[string][]string{}
+		dtoImportsMap := map[string][]string{}
 
 		indexExportBuffer = append(indexExportBuffer, fmt.Sprintf("export * from './%s/%s.module'", camels, camel))
 
-		importsMap["@nestjs/graphql"] = safeAppend(importsMap["@nestjs/graphql"], "ObjectType")
+		dtoImportsMap["@nestjs/graphql"] = safeAppend(dtoImportsMap["@nestjs/graphql"], "ObjectType")
 
 		dtoBuffer := make([]string, 0)
 		dtoBuffer = append(dtoBuffer, fmt.Sprintf("@ObjectType('%s')\nexport class %sDTO {", pascal, pascal))
 		dtoBuffer = append(dtoBuffer, "\n\t@FilterableField()\n\tid: number;\n\n\t@FilterableField()\n\tcreatedAt: Date;\n\n\t@FilterableField()\n\tupdatedAt: Date;\n\n\t@FilterableField()\n\tdeletedAt: Date;\n")
 
+		createDtoBuffer := []string{
+			"import { InputType, Field } from '@nestjs/graphql';\n",
+			fmt.Sprintf("@InputType()\nexport class Create%sDTO {", pascal),
+		}
+
+		updateDtoBuffer := []string{
+			"import { InputType, Field } from '@nestjs/graphql';",
+			fmt.Sprintf("import { Create%sDTO } from './create-%s.dto';\n", pascal, camel),
+			fmt.Sprintf("@InputType()\nexport class Update%sDTO extends Create%sDTO {", pascal, pascal),
+			"\t@Field({ nullable: true })\n\tid: number",
+			"}",
+		}
+
 		// fields
 		for _, f := range n.Fields {
 			field := ""
 			options := ""
+			createOptions := ""
 			optionsBuffer := make([]string, 0)
+			createOptionsBuffer := make([]string, 0)
 
 			if !f.Sensitive {
 				field = "@FilterableField"
-				importsMap["@nestjs-query/query-graphql"] = safeAppend(importsMap["@nestjs-query/query-graphql"], "FilterableField")
+				dtoImportsMap["@nestjs-query/query-graphql"] = safeAppend(dtoImportsMap["@nestjs-query/query-graphql"], "FilterableField")
 			} else {
 				field = "@Field"
-				importsMap["@nestjs/graphql"] = safeAppend(importsMap["@nestjs/graphql"], "Field")
+				dtoImportsMap["@nestjs/graphql"] = safeAppend(dtoImportsMap["@nestjs/graphql"], "Field")
 			}
 
 			if f.Nullable {
 				optionsBuffer = append(optionsBuffer, "nullable: true")
+				createOptionsBuffer = append(createOptionsBuffer, "nullable: true")
 			}
 
 			if strings.Trim(f.Default, " ") != "" {
 				if f.Type == "string" {
 					optionsBuffer = append(optionsBuffer, fmt.Sprintf("defaultValue: \"%s\"", f.Default))
+					createOptionsBuffer = append(createOptionsBuffer, fmt.Sprintf("defaultValue: \"%s\"", f.Default))
 				} else {
 					optionsBuffer = append(optionsBuffer, "defaultValue:"+f.Default)
+					createOptionsBuffer = append(createOptionsBuffer, "defaultValue:"+f.Default)
 				}
 			}
 
@@ -187,46 +205,59 @@ func GraphQL(nodes []types.Node) []types.File {
 				options = "{ " + strings.Join(optionsBuffer, ", ") + " }"
 			}
 
+			if len(createOptionsBuffer) > 0 {
+				createOptions = "{ " + strings.Join(createOptionsBuffer, ", ") + " }"
+			}
+
 			// push column to buffer
 			if !f.Pk && !f.Pfk && !f.Fk {
 				dtoBuffer = append(dtoBuffer, fmt.Sprintf("\t%s(%s)\n\t%s: %s;\n", field, options, f.Name, f.Type))
+				createDtoBuffer = append(createDtoBuffer, fmt.Sprintf("\t@Field(%s)\n\t%s: %s;\n", createOptions, f.Name, f.Type))
 			}
+
+			// push column to create buffer
 		}
 
 		relationshipBuffer := make([]string, 0)
 
 		// relationshipts
 		for _, e := range n.Edges {
-
 			if e.Direction == "In" {
 				relationshipBuffer = append(relationshipBuffer, fmt.Sprintf("@Relation('%s',() => %sDTO)", h.Camel(h.Singular(e.Name)), h.Pascal(h.Singular(e.Name))))
-				importsMap["@nestjs-query/query-graphql"] = safeAppend(importsMap["@nestjs-query/query-graphql"], "Relation")
+				dtoImportsMap["@nestjs-query/query-graphql"] = safeAppend(dtoImportsMap["@nestjs-query/query-graphql"], "Relation")
 
 				object := fmt.Sprintf("../%s/%s.dto", h.Camel(h.Plural(e.Name)), h.Camel(h.Singular(e.Name)))
-				importsMap[object] = safeAppend(importsMap[object], h.Pascal(h.Singular(e.Name))+"DTO")
+				dtoImportsMap[object] = safeAppend(dtoImportsMap[object], h.Pascal(h.Singular(e.Name))+"DTO")
+
+				if e.Type == "0..1" || e.Type == "0..N" {
+					createDtoBuffer = append(createDtoBuffer, fmt.Sprintf("\t@Field({ nullable: true })\n\t%sId: %s;", h.Camel(h.Singular(e.Name)), e.Field.Type))
+				} else {
+					createDtoBuffer = append(createDtoBuffer, fmt.Sprintf("\t@Field()\n\t%sId: %s;", h.Camel(h.Singular(e.Name)), e.Field.Type))
+				}
 			}
 
 			if e.Direction == "Out" {
-
 				switch e.Type {
 				case "0..1", "1..1":
 					relationshipBuffer = append(relationshipBuffer, fmt.Sprintf("@Relation('%s',() => %sDTO)", h.Camel(h.Singular(e.Name)), h.Pascal(h.Singular(e.Name))))
-					importsMap["@nestjs-query/query-graphql"] = safeAppend(importsMap["@nestjs-query/query-graphql"], "Relation")
+					dtoImportsMap["@nestjs-query/query-graphql"] = safeAppend(dtoImportsMap["@nestjs-query/query-graphql"], "Relation")
 
 				case "0..N", "1..N":
 					relationshipBuffer = append(relationshipBuffer, fmt.Sprintf("@FilterableOffsetConnection('%s', () => %sDTO, { nullable: true })", h.Camel(h.Plural(e.Name)), h.Pascal(h.Singular(e.Name))))
-					importsMap["@nestjs-query/query-graphql"] = safeAppend(importsMap["@nestjs-query/query-graphql"], "FilterableOffsetConnection")
+					dtoImportsMap["@nestjs-query/query-graphql"] = safeAppend(dtoImportsMap["@nestjs-query/query-graphql"], "FilterableOffsetConnection")
 				}
 
 				object := fmt.Sprintf("../%s/%s.dto", h.Camel(h.Plural(e.Name)), h.Camel(h.Singular(e.Name)))
-				importsMap[object] = safeAppend(importsMap[object], h.Pascal(h.Singular(e.Name))+"DTO")
+				dtoImportsMap[object] = safeAppend(dtoImportsMap[object], h.Pascal(h.Singular(e.Name))+"DTO")
 			}
 		}
+
+		createDtoBuffer = append(createDtoBuffer, "}")
 
 		dtoBuffer = append(dtoBuffer, "}")
 		importBuffer := make([]string, 0)
 
-		for k, v := range importsMap {
+		for k, v := range dtoImportsMap {
 			importBuffer = append(importBuffer, fmt.Sprintf("import { %s } from '%s';", strings.Join(v, ", "), k))
 		}
 
@@ -234,14 +265,14 @@ func GraphQL(nodes []types.Node) []types.File {
 
 		dtoBuffer = append(importBuffer, append(relationshipBuffer, strings.Join(dtoBuffer, "\n"))...)
 
-		// TODO: add modules and create / update dtos
-
 		moduleBuffer := make([]string, 0)
 		moduleBuffer = append(moduleBuffer, "import { Module } from '@nestjs/common';")
 		moduleBuffer = append(moduleBuffer, "import { NestjsQueryGraphQLModule, PagingStrategies } from '@nestjs-query/query-graphql';")
 		moduleBuffer = append(moduleBuffer, "import { NestjsQueryTypeOrmModule } from '@nestjs-query/query-typeorm';")
 		moduleBuffer = append(moduleBuffer, fmt.Sprintf("import { %s } from './%s.entity';", pascal, camel))
 		moduleBuffer = append(moduleBuffer, fmt.Sprintf("import { %sDTO } from './%s.dto';\n", pascal, camel))
+		moduleBuffer = append(moduleBuffer, fmt.Sprintf("import { Create%sDTO } from './create-%s.dto';\n", pascal, camel))
+		moduleBuffer = append(moduleBuffer, fmt.Sprintf("import { Update%sDTO } from './update-%s.dto';\n", pascal, camel))
 		moduleBuffer = append(moduleBuffer, "@Module({")
 		moduleBuffer = append(moduleBuffer, "\timports:[")
 		moduleBuffer = append(moduleBuffer, "\t\tNestjsQueryGraphQLModule.forFeature({")
@@ -250,6 +281,8 @@ func GraphQL(nodes []types.Node) []types.File {
 		moduleBuffer = append(moduleBuffer, "\t\t\t\t{")
 		moduleBuffer = append(moduleBuffer, fmt.Sprintf("\t\t\t\t\tDTOClass: %sDTO,", pascal))
 		moduleBuffer = append(moduleBuffer, fmt.Sprintf("\t\t\t\t\tEntityClass: %s,", pascal))
+		moduleBuffer = append(moduleBuffer, fmt.Sprintf("\t\t\t\t\tCreateDTOClass: Create%sDTO,", pascal))
+		moduleBuffer = append(moduleBuffer, fmt.Sprintf("\t\t\t\t\tUpdateDTOClass: Update%sDTO,", pascal))
 		moduleBuffer = append(moduleBuffer, "\t\t\t\t\tenableTotalCount: true,")
 		moduleBuffer = append(moduleBuffer, "\t\t\t\t\tpagingStrategy: PagingStrategies.OFFSET,")
 		moduleBuffer = append(moduleBuffer, "\t\t\t\t},")
@@ -264,7 +297,16 @@ func GraphQL(nodes []types.Node) []types.File {
 			Buffer: strings.Join(moduleBuffer, "\n"),
 		})
 
-		// create and append the file
+		files = append(files, types.File{
+			Path:   fmt.Sprintf("%s/create-%s.dto.ts", camels, camel),
+			Buffer: strings.Join(createDtoBuffer, "\n"),
+		})
+
+		files = append(files, types.File{
+			Path:   fmt.Sprintf("%s/update-%s.dto.ts", camels, camel),
+			Buffer: strings.Join(updateDtoBuffer, "\n"),
+		})
+
 		files = append(files, types.File{
 			Path:   fmt.Sprintf("%s/%s.dto.ts", h.Camel(n.Name), h.Camel(h.Singular(n.Name))),
 			Buffer: strings.Join(dtoBuffer, "\n"),
