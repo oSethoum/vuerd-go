@@ -18,10 +18,10 @@ var rootCmd = &cobra.Command{
 	Use:   "vuerd",
 	Short: "Generate API based on your ERD diagram ( vuerd vscode extension )",
 	Run: func(cmd *cobra.Command, args []string) {
-		// var state types.State
-		// utils.ReadJSON(&state, "db/db.vuerd.json")
-		// typeorm.Engine(state)
-		VuerdCmd()
+		var state types.State
+		utils.ReadJSON(&state, "db/db.vuerd.json")
+		typeorm.Engine(state)
+		//VuerdCmd()
 	},
 }
 

@@ -22,7 +22,7 @@ func Ent(state types.State, pkg string) {
 	// create resolvers
 	files = append(files, Resolvers(nodes, pkg)...)
 
-	utils.WriteFiles(files, &cwd)
+	utils.WriteFiles(files, cwd)
 
 	err := exec.Command("go", "mod", "init").Run()
 	if err != nil {

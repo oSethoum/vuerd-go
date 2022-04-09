@@ -17,21 +17,21 @@ func (Helper) Plural(word string) string {
 	return Pluralize.Plural(word)
 }
 
-// func (Helper) MultiPlural(word string) string {
-// 	words := strings.Split(word, "_")
-// 	for i := 0; i < len(words); i++ {
-// 		words[i] = Pluralize.Plural(words[i])
-// 	}
-// 	return strings.Join(words, "_")
-// }
+func (Helper) MultiPlural(word string) string {
+	words := strings.Split(word, "_")
+	for i := 0; i < len(words); i++ {
+		words[i] = Pluralize.Plural(words[i])
+	}
+	return strings.Join(words, "_")
+}
 
-// func (Helper) MultiSingular(word string) string {
-// 	words := strings.Split(word, "_")
-// 	for i := 0; i < len(words); i++ {
-// 		words[i] = Pluralize.Singular(words[i])
-// 	}
-// 	return strings.Join(words, "_")
-// }
+func (Helper) MultiSingular(word string) string {
+	words := strings.Split(word, "_")
+	for i := 0; i < len(words); i++ {
+		words[i] = Pluralize.Singular(words[i])
+	}
+	return strings.Join(words, "_")
+}
 
 func (Helper) Singular(word string) string {
 	return Pluralize.Singular(word)

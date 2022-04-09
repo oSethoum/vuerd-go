@@ -13,6 +13,5 @@ func Gorm(state types.State) {
 	files = append(files, Schema(nodes))
 	files = append(files, DB(nodes, "sqlite", "api"))
 	files = append(files, Services(nodes, "api")...)
-	dir := "out"
-	utils.WriteFiles(files, &dir)
+	utils.WriteFiles(files, "out")
 }
