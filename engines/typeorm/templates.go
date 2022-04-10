@@ -12,8 +12,8 @@ func Schema(nodes []types.Node) []types.File {
 
 	// base entity
 	baseEntityBuffer := make([]string, 0)
-	baseEntityBuffer = append(baseEntityBuffer, "import { Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';\n")
-	baseEntityBuffer = append(baseEntityBuffer, "@Entity()\nexport class BaseEntity {\n\t@PrimaryGeneratedColumn()\n\tid: number;\n\n\t@CreateDateColumn()\n\tcreatedAt: Date;\n\n\t@UpdateDateColumn()\n\tupdatedAt: Date;\n\n\t@DeleteDateColumn()\n\tdeletedAt: Date;\n}")
+	baseEntityBuffer = append(baseEntityBuffer, "import { PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';\n")
+	baseEntityBuffer = append(baseEntityBuffer, "export class BaseEntity {\n\t@PrimaryGeneratedColumn()\n\tid: number;\n\n\t@CreateDateColumn()\n\tcreatedAt: Date;\n\n\t@UpdateDateColumn()\n\tupdatedAt: Date;\n\n\t@DeleteDateColumn()\n\tdeletedAt: Date;\n}")
 
 	files = append(files, types.File{
 		Path:   "bases/base.entity.ts",
