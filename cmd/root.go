@@ -20,7 +20,7 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// var state types.State
 		// utils.ReadJSON(&state, "db/db.vuerd.json")
-		// typeorm.Engine(state)
+
 		VuerdCmd()
 	},
 }
