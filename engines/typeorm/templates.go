@@ -246,6 +246,7 @@ func GraphQL(nodes []types.Node) []types.File {
 		moduleBuffer = append(moduleBuffer, "\t\t\t\t{")
 		moduleBuffer = append(moduleBuffer, fmt.Sprintf("\t\t\t\t\tDTOClass: %sDTO,", pascal))
 		moduleBuffer = append(moduleBuffer, fmt.Sprintf("\t\t\t\t\tEntityClass: %s,", pascal))
+		moduleBuffer = append(moduleBuffer, "\t\t\t\t\tenableTotalCount: true,")
 		moduleBuffer = append(moduleBuffer, "\t\t\t\t\tpagingStrategy: PagingStrategies.OFFSET,")
 		moduleBuffer = append(moduleBuffer, "\t\t\t\t},")
 		moduleBuffer = append(moduleBuffer, "\t\t\t],")
