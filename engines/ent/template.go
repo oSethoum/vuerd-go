@@ -161,7 +161,7 @@ func Schema(nodes []types.Node, config *SchemaConfig, pkg string) []types.File {
 				if field.Name == "updated_at" {
 					options = append(options, "Default(time.Now)", "UpdateDefault(time.Now)")
 				}
-				if config.Graphql && !field.Sensitive {
+				if config.Graphql {
 					options = append(options, fmt.Sprintf("Annotations(entgql.OrderField(\"%s\"))", strings.ToUpper(field.Name)))
 				}
 
@@ -396,7 +396,7 @@ func GQL(nodes []types.Node, pkg string, wherePrefix string) []types.File {
 				f.Type += "!"
 			}
 
-			if !f.Pk && !f.Fk && !f.Pfk && f.Name != "created_at" && f.Name != "updated_at" && !f.Sensitive {
+			if !f.Pk && !f.Fk && !f.Pfk && f.Name != "created_at" && f.Name != "updated_at" {
 				if f.Type != "Json" {
 					orderFieldEnumBuffer = append(orderFieldEnumBuffer, "\t"+strings.ToUpper(helper.Snake(f.Name)))
 				}
@@ -764,6 +764,7 @@ func Resolvers(nodes []types.Node, pkg string) []types.File {
 		"import (",
 		"	\"" + pkg + "/ent\"",
 		"	\"github.com/99designs/gqlgen/graphql\"",
+		"  \"" + pkg + "/graph/generated\"",
 		")",
 		"",
 		"type Resolver struct {",
@@ -772,7 +773,7 @@ func Resolvers(nodes []types.Node, pkg string) []types.File {
 		"",
 		"var schema *graphql.ExecutableSchema",
 		"",
-		"func (client *ent.Client) graphql.ExecutableSchema {",
+		"func NewSchema(client *ent.Client) graphql.ExecutableSchema {",
 		"	if schema == nil {",
 		"	schema = new(graphql.ExecutableSchema)",
 		"	*schema = generated.NewExecutableSchema(generated.Config{Resolvers: &Resolver{",
