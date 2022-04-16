@@ -18,9 +18,6 @@ var rootCmd = &cobra.Command{
 	Use:   "vuerd",
 	Short: "Generate API based on your ERD diagram ( vuerd vscode extension )",
 	Run: func(cmd *cobra.Command, args []string) {
-		// var state types.State
-		// utils.ReadJSON(&state, "db/db.vuerd.json")
-
 		VuerdCmd()
 	},
 }
@@ -31,10 +28,12 @@ type promptContent struct {
 }
 
 func VuerdCmd() {
-	dbPath := promptGetInput(promptContent{
-		label:    "Enter the path for your database.vuerd.json file",
-		errorMsg: "Please Enter the path for your database.vuerd.json file",
-	})
+	// dbPath := promptGetInput(promptContent{
+	// 	label:    "Enter the path for your database.vuerd.json file",
+	// 	errorMsg: "Please Enter the path for your database.vuerd.json file",
+	// })
+
+	dbPath := "db/schema.vuerd.json"
 
 	language := promptGetSelect(promptContent{
 		label:    "Select the language of your project",
